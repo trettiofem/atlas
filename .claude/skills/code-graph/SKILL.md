@@ -1,0 +1,72 @@
+---
+name: code-graph
+description: Navigate the indexed project through its code graph (the code-graph MCP server) instead of grepping. Use when you need where a symbol is defined, its source, who calls it or what it calls, what references it, which files depend on a file, which tests cover some code, or what a change could affect. Also use to orient yourself in unfamiliar code. Fall back to grep only for strings, comments, config and other non-code text.
+---
+
+# Code graph
+
+The `code-graph` MCP server answers symbol-level questions from a Neo4j graph built from a SCIP index of one
+project: files, symbols (labelled `Type`, `Method`, `Term`, `Namespace`, `Parameter`…), and the edges between
+them (defines, references, uses, contains, imports, implements). Answers are exact rather than text matches,
+and they cost far less context than reading files.
+
+## 1. Check what's loaded
+
+Call `overview` first. It returns the project root, the indexer, when the graph was loaded, and file and symbol
+counts.
+
+- **"graph is not loaded", or the root isn't the project you're working on:** load it from the code-graph repo
+  (where `.mcp.json` lives) with `pnpm graph sync -p <project dir>`, then call `overview` again. Neo4j must be
+  running (`docker compose up -d --wait`).
+- **You (or the user) have edited code since `loadedAt`:** results for the edited files may be stale. Re-run the
+  sync if it matters for the task.
+
+## 2. Pick a tool
+
+| Question | Tool |
+|---|---|
+| I only know part of the name | `search_symbols` (`query`, optional `kind`, `limit`) |
+| Where is X defined? | `find_symbol` |
+| Show me X's code | `get_source`, which returns the definition with line numbers, not the whole file |
+| What's in this file? | `outline` |
+| Who uses X? | `callers` (symbol-level, `depth` up to 10) or `references` (file-level, includes top-level code) |
+| What does X depend on? | `callees` |
+| What does this file import, and what imports it? | `file_dependencies`, `file_dependents` |
+| Which tests cover X? | `tests_for` |
+| What breaks if I change X? | `impact` |
+
+Results include `file` (project-relative) and `path` (absolute). Use `path` with Read or Edit. Tools accept
+either form for `file` inputs.
+
+## 3. Common workflows
+
+**Understand a symbol**
+1. `search_symbols` to get the exact name, kind and file.
+2. `get_source` (pass `file` if there are several matches).
+3. `callees` to see what it relies on, and `callers` to see how it's used. Use `get_source` on the interesting
+   ones.
+
+**Plan a change to X**
+1. `impact` for the set of files at risk.
+2. `tests_for` to find the tests to run afterwards.
+3. `callers` with `depth` 2–3, plus `get_source` on the direct callers, to check how call sites depend on the
+   current behaviour.
+
+**Orient in a file or module**
+`outline`, then `file_dependencies` and `file_dependents`, then `get_source` on the symbols that matter.
+
+## 4. Caveats
+
+- **Names aren't unique.** If a name-based tool returns several symbols (in different files, or a field and a
+  method), repeat the call with `file` to pick one.
+- **Names are exact** in every tool except `search_symbols`.
+- **Top-level code has no enclosing symbol.** A call at module top level, or in a test's `describe`/`it`
+  callback that the indexer doesn't treat as a symbol, shows up in `references`, `impact` and `tests_for` but
+  not in `callers`. Check `references` before concluding something is unused.
+- **Parameters are skipped.** They appear in `outline` and `search_symbols` (with `kind: "Parameter"`), but
+  references to them aren't recorded.
+- **External code isn't included.** Symbols from dependencies (npm packages, the standard library) are
+  references only, with no source.
+- **One project at a time.** Loading another project replaces the graph.
+- **Not everything is code.** For strings, comments, config files, docs, or anything the indexer doesn't
+  cover, use grep or Glob.
