@@ -1,7 +1,8 @@
 import { BookSearch, Bot, House, type LucideIcon, ScrollText, Waypoints } from "lucide-react";
+import { useMemo } from "react";
 import { AgentIcon } from "@/agent-icon";
 import { useAgents } from "@/agents-store";
-import { artifactHref } from "@/api";
+import { type Agent, artifactHref } from "@/api";
 import logo from "@/assets/Logo.svg";
 import wordmark from "@/assets/LogoWordmark.svg";
 import avatar from "@/assets/UserLarge.svg";
@@ -19,10 +20,34 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { USER } from "@/mock";
-import { useRecentArtifacts, useRecentSymbols } from "@/recent";
+import { RECENT_LIMIT, type RecentSymbol, useRecentAgents, useRecentArtifacts, useRecentSymbols } from "@/recent";
 import { SymbolIcon, searchHref } from "@/symbol";
 
-const RECENT_AGENTS = 5;
+type RecentEntry = { at: number } & (
+  | { type: "symbol"; symbol: RecentSymbol }
+  | { type: "artifact"; topic: string }
+  | { type: "agent"; agent: Agent }
+);
+
+/**
+ * Symbols, artifacts and agents in one list, the last touched first. An agent counts as touched when it was created,
+ * or later when the user opened or messaged it. Entries saved before touch times existed sort last.
+ */
+function useRecent(): RecentEntry[] {
+  const symbols = useRecentSymbols();
+  const artifacts = useRecentArtifacts();
+  const touchedAgents = useRecentAgents();
+  const { agents } = useAgents();
+  return useMemo(() => {
+    const touched = new Map(touchedAgents.map((a) => [a.id, a.at ?? 0]));
+    const entries: RecentEntry[] = [
+      ...symbols.map((symbol) => ({ type: "symbol" as const, at: symbol.at ?? 0, symbol })),
+      ...artifacts.map(({ topic, at }) => ({ type: "artifact" as const, at: at ?? 0, topic })),
+      ...agents.map((agent) => ({ type: "agent" as const, at: Math.max(touched.get(agent.id) ?? 0, agent.createdAt), agent })),
+    ];
+    return entries.sort((a, b) => b.at - a.at).slice(0, RECENT_LIMIT);
+  }, [symbols, artifacts, touchedAgents, agents]);
+}
 
 export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
   { path: "/", title: "Home", icon: House },
@@ -34,9 +59,7 @@ export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
 
 // Collapsed ("icon") mode: the mark replaces the wordmark, the trigger moves to the footer and Recent hides.
 export function AppSidebar({ route }: { route: string }) {
-  const symbols = useRecentSymbols();
-  const artifacts = useRecentArtifacts();
-  const { agents } = useAgents();
+  const recent = useRecent();
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex-row items-center justify-between px-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
@@ -64,43 +87,46 @@ export function AppSidebar({ route }: { route: string }) {
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <SidebarGroupLabel>Recent</SidebarGroupLabel>
           <SidebarMenu>
-            {symbols.map((s) => (
-              <SidebarMenuItem key={`${s.file}:${s.line}:${s.name}`}>
-                <SidebarMenuButton asChild>
-                  <a href={searchHref({ q: s.name, name: s.name, file: s.file, line: s.line })} title={`${s.file}:${s.line}`}>
-                    <SymbolIcon kind={s.kind} />
-                    <span className="font-mono">{s.name}</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-            {artifacts.map((topic) => (
-              <SidebarMenuItem key={topic}>
-                <SidebarMenuButton asChild>
-                  <a href={artifactHref(topic)} title={topic}>
-                    <ScrollText className="text-muted-foreground" />
-                    <span>{topic}</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-            {agents.slice(0, RECENT_AGENTS).map((a) => (
-              <SidebarMenuItem key={a.id}>
-                <SidebarMenuButton asChild>
-                  <a href={`#/agents/${a.id}`}>
-                    <AgentIcon status={a.status} />
-                    {a.named ? (
-                      <span>{a.title}</span>
-                    ) : (
-                      <>
-                        <Skeleton aria-hidden className="h-3.5 flex-1 bg-border" />
-                        <span className="sr-only">{a.title}</span>
-                      </>
-                    )}
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            {recent.map((r) =>
+              r.type === "symbol" ? (
+                <SidebarMenuItem key={`symbol:${r.symbol.file}:${r.symbol.line}:${r.symbol.name}`}>
+                  <SidebarMenuButton asChild>
+                    <a
+                      href={searchHref({ q: r.symbol.name, name: r.symbol.name, file: r.symbol.file, line: r.symbol.line })}
+                      title={`${r.symbol.file}:${r.symbol.line}`}
+                    >
+                      <SymbolIcon kind={r.symbol.kind} />
+                      <span className="font-mono">{r.symbol.name}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : r.type === "artifact" ? (
+                <SidebarMenuItem key={`artifact:${r.topic}`}>
+                  <SidebarMenuButton asChild>
+                    <a href={artifactHref(r.topic)} title={r.topic}>
+                      <ScrollText className="text-muted-foreground" />
+                      <span>{r.topic}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : (
+                <SidebarMenuItem key={`agent:${r.agent.id}`}>
+                  <SidebarMenuButton asChild>
+                    <a href={`#/agents/${r.agent.id}`}>
+                      <AgentIcon status={r.agent.status} />
+                      {r.agent.named ? (
+                        <span>{r.agent.title}</span>
+                      ) : (
+                        <>
+                          <Skeleton aria-hidden className="h-3.5 flex-1 bg-border" />
+                          <span className="sr-only">{r.agent.title}</span>
+                        </>
+                      )}
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ),
+            )}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

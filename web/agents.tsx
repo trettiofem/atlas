@@ -15,6 +15,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { fuzzyFilter } from "@/fuzzy";
 import { USER } from "@/mock";
 import { PromptBox } from "@/prompt-box";
+import { rememberAgent } from "@/recent";
 import { type FileRef, SourcePanel } from "@/source";
 
 /** #/agents/new: an empty conversation whose first prompt creates the agent. */
@@ -27,6 +28,11 @@ export const findAgent = (agents: Agent[], id?: string) => (id ? agents.find((a)
 export function Agents({ id }: { id?: string }) {
   const { agents: all, loaded } = useAgents();
   const agent = findAgent(all, id);
+  // Only agents the user picked, not the newest opened by default.
+  const opened = id && agent ? agent.id : undefined;
+  useEffect(() => {
+    if (opened) rememberAgent(opened);
+  }, [opened]);
   const [query, setQuery] = useState("");
   const q = query.trim();
   // shortcut: every agent is the mock USER's until agents have real creators.
@@ -224,6 +230,7 @@ function Conversation({ agent }: { agent: Agent }) {
     setError(undefined);
     setPrompt("");
     pinned.current = true;
+    rememberAgent(agent.id);
     try {
       await sendMessage(agent.id, text);
     } catch (e) {

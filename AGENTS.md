@@ -28,7 +28,7 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - **Agents and the Explain chat** run on the server with the Anthropic Messages API, Haiku by default (`CLAUDE_MODEL` overrides it), using the key in `.env` (`CLAUDE_API_KEY`). [src/agent.ts](src/agent.ts) is the run loop. It starts [src/mcp.ts](src/mcp.ts) as an MCP client over stdio, so Claude gets the same code-graph tools as Claude Code, plus a local `show_code` tool that adds a file reference with its lines to the transcript. [src/agents.ts](src/agents.ts) keeps agents in memory, streams changes, and recovers agents a stopped server left working.
 - **Agents storage**: [src/agents-db.ts](src/agents-db.ts) saves agents in SQLite, in the `agents` table of `atlas.db` (git-ignored, opened by [src/store.ts](src/store.ts) and shared with artifacts), separate from the code graph. Turns and the Anthropic history are JSON columns. Agents have no owner yet; add users before agents have several.
 - **Mock data**: only the user (`USER` in [web/mock.tsx](web/mock.tsx)), shown in the sidebar footer and as every agent's creator.
-- **Recent symbols and artifacts**: [web/recent.ts](web/recent.ts) keeps the last 5 symbols opened in Search and the last 5 artifacts opened (picked, not the newest shown by default; deleting one drops it) in localStorage, for "Recent".
+- **Recent**: [web/recent.ts](web/recent.ts) keeps, in localStorage and each with the time it was touched, the last 8 symbols opened in Search, artifacts opened (deleting one drops it) and agents opened or messaged. Opening means picking one, not the newest a page shows by default. The sidebar's "Recent" merges them.
 
 ### Design tokens
 
@@ -85,7 +85,7 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 - **Expanded**:
   - Header: `LogoWordmark.svg` on the left and the collapse trigger on the right.
   - Nav: Home (`House`), Agents (`Bot`), Artifacts (`ScrollText`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
-  - "Recent": the symbols, artifacts and agents the user last touched. Symbols (the last 5 opened in Search) come first, with their `SymbolIcon` and mono text, and link back to Search. Artifacts (the last 5 opened) follow, with `ScrollText` and the topic in sans text. Agents (the 5 newest) show `AgentIcon` and sans text. All entries truncate with an ellipsis.
+  - "Recent": the 8 symbols, artifacts and agents the user last touched, in one list, the last touched first. An agent's time is when it was created, or later when the user opened or messaged it. Symbols show their `SymbolIcon` and mono text and link back to Search, artifacts `ScrollText` and the topic, agents `AgentIcon` and the title, both in sans text. All entries truncate with an ellipsis.
   - Footer: the user, with the 24px `UserLarge.svg` avatar, the name in `font-medium` and the muted org underneath. It's mock data (`USER` in `mock.tsx`) and does nothing yet.
 - **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Recent" hidden, and at the bottom the avatar above the trigger.
 - What the nav items do:

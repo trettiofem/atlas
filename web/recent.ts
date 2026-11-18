@@ -1,27 +1,32 @@
 import { useSyncExternalStore } from "react";
 import type { SymbolRef } from "@/symbol";
 
-const MAX = 5;
+/** How many entries the sidebar's Recent list shows, and so how many each kind keeps. */
+export const RECENT_LIMIT = 8;
 
-/** A newest-first list of the last 5 items opened, in localStorage under `key`, for the sidebar's Recent list. */
-function recentList<T>(key: string, same: (a: T, b: T) => boolean) {
+/** `at` is when it was last touched, in milliseconds; entries saved before it existed have none. */
+export type Touched<T> = T & { at?: number };
+
+/** A newest-first list of the items last touched, in localStorage under `key`, for the sidebar's Recent list. */
+function recentList<T extends object>(key: string, same: (a: T, b: T) => boolean) {
   const change = `atlas:${key}`;
-  const parse = (raw: string | null): T[] => {
+  const parse = (raw: string | null): Touched<T>[] => {
     try {
       const list = JSON.parse(raw ?? "[]");
-      return Array.isArray(list) ? list : [];
+      return Array.isArray(list) ? list.filter((x) => x && typeof x === "object") : [];
     } catch {
       return [];
     }
   };
-  const write = (list: T[]) => {
+  const read = () => parse(localStorage.getItem(key));
+  const write = (list: Touched<T>[]) => {
     localStorage.setItem(key, JSON.stringify(list));
     dispatchEvent(new Event(change));
   };
 
   // useSyncExternalStore compares snapshots by identity, so reparse only when the stored string changes.
   let raw: string | null = null;
-  let snapshot: T[] = [];
+  let snapshot: Touched<T>[] = [];
   const getSnapshot = () => {
     const next = localStorage.getItem(key);
     if (next !== raw) [raw, snapshot] = [next, parse(next)];
@@ -39,9 +44,9 @@ function recentList<T>(key: string, same: (a: T, b: T) => boolean) {
   };
 
   return {
-    /** Puts the item first. */
-    remember: (item: T) => write([item, ...parse(localStorage.getItem(key)).filter((x) => !same(x, item))].slice(0, MAX)),
-    forget: (item: T) => write(parse(localStorage.getItem(key)).filter((x) => !same(x, item))),
+    /** Puts the item first, touched now. */
+    remember: (item: T) => write([{ ...item, at: Date.now() }, ...read().filter((x) => !same(x, item))].slice(0, RECENT_LIMIT)),
+    forget: (item: T) => write(read().filter((x) => !same(x, item))),
     use: () => useSyncExternalStore(subscribe, getSnapshot),
   };
 }
@@ -57,12 +62,20 @@ export const rememberSymbol = symbols.remember;
 /** The symbols last opened in Search, newest first. */
 export const useRecentSymbols = symbols.use;
 
-const artifacts = recentList<string>("atlas.recentArtifacts", (a, b) => a === b);
+const artifacts = recentList<{ topic: string }>("atlas.recentArtifacts", (a, b) => a.topic === b.topic);
 
-export const rememberArtifact = artifacts.remember;
+export const rememberArtifact = (topic: string) => artifacts.remember({ topic });
 
 /** Drops a deleted artifact. */
-export const forgetArtifact = artifacts.forget;
+export const forgetArtifact = (topic: string) => artifacts.forget({ topic });
 
-/** The topics of the artifacts last opened, newest first. */
+/** The artifacts last opened, newest first. */
 export const useRecentArtifacts = artifacts.use;
+
+const agents = recentList<{ id: string }>("atlas.recentAgents", (a, b) => a.id === b.id);
+
+/** When the user opens an agent or sends it a message. */
+export const rememberAgent = (id: string) => agents.remember({ id });
+
+/** The agents last opened or messaged, newest first. */
+export const useRecentAgents = agents.use;
