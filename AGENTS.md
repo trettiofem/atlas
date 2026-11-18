@@ -10,19 +10,20 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - [src/web.ts](src/web.ts) is the Vite config. It is inline with `configFile: false` and sets the Tailwind plugin and the `@` → `web/` alias. There is no `vite.config.ts`.
 - shadcn components are in `web/components/ui/` and `cn` is in `web/lib/utils.ts`. These files are ours to edit. The shadcn CLI doesn't run in this layout (no `package.json` in `web/`). To add a component, fetch `https://ui.shadcn.com/r/styles/new-york-v4/<name>.json`, write its `files[].content`, rewrite `@/registry/new-york-v4/ui/` → `@/components/ui/` and `"cn"` → `"@/lib/utils"`, and add its npm `dependencies` at the repo root.
 - Theme tokens are in [web/style.css](web/style.css).
-- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/graph`. It also sets the document title from the route: the open symbol or agent, then the page, then "Atlas" (`_minColorDistance · Symbols · Atlas`). Home is just "Atlas".
-- Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx) and [web/agents.tsx](web/agents.tsx). Code Graph is a placeholder.
+- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/graph[?<params>]`. It also sets the document title from the route: the open symbol or agent, then the page, then "Atlas" (`_minColorDistance · Symbols · Atlas`). Home is just "Atlas".
+- Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx), [web/agents.tsx](web/agents.tsx) and [web/graph.tsx](web/graph.tsx) (Code Graph).
 - Shared components:
   - [web/app-sidebar.tsx](web/app-sidebar.tsx).
   - [web/prompt-box.tsx](web/prompt-box.tsx): the prompt box on Home and Agents.
   - [web/agent-icon.tsx](web/agent-icon.tsx): the status dot.
   - [web/source.tsx](web/source.tsx): `CodeLines`, `SourceText` (a whole file, scrolled to its highlight) and `SourcePanel`, shared by Agents and Search. Every code view goes through `CodeLines`, which takes the whole file's text and path. Snippets pass `only` with their lines, so they're colored in the context of the whole file.
  - [web/highlight.ts](web/highlight.ts): syntax highlighting with Shiki (`useTokens`). It picks the language from the path's extension, loads that grammar on demand and caches the last 20 files. Code shows plain until the tokens arrive, and stays plain for unknown languages.
-  - [web/symbol.tsx](web/symbol.tsx): `SymbolIcon`, kind labels, `PathLabel` and `searchHref`.
+  - [web/symbol.tsx](web/symbol.tsx): `SymbolIcon`, kind labels, `PathLabel`, `searchHref` and `graphHref`.
   - [web/chat.tsx](web/chat.tsx): `UserMessage` (the raised bubble) and `Step` (an icon, a label and a duration, or a spinner while running), shared by Agents and the Explain chat.
   - [web/explain.tsx](web/explain.tsx): the Explain tip and the Explain chat dialog (`components/ui/dialog.tsx`).
  - [web/tunnel.tsx](web/tunnel.tsx): `Tunnel`, the generated SVG wireframe tunnel behind Home.
-- **Backend**: Search and Home's project row are live. [web/api.ts](web/api.ts) has the row types and `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests. A 503 means no graph is loaded.
+ - [web/graph-canvas.tsx](web/graph-canvas.tsx): `GraphCanvas`, the Cytoscape view of the Code Graph, and [web/graph-model.ts](web/graph-model.ts), the pure model of what it shows (tested in `graph-model.test.ts`).
+- **Backend**: Search, Code Graph and Home's project row are live. [web/api.ts](web/api.ts) has the row and graph types, `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests, and `fetchJson` for one-off requests and POSTs. A 503 means no graph is loaded.
 - **Mock data**: agents, transcripts and their source are in [web/mock.tsx](web/mock.tsx), and so are the agents in the sidebar's "Latest" list. Sending a prompt does nothing yet, and the Explain chat never answers.
 - **Recent symbols**: [web/recent.ts](web/recent.ts) keeps the last 5 symbols opened in Search in localStorage, for "Latest".
 
@@ -68,7 +69,7 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
 
 ### Symbol kinds
 
-`SymbolIcon` from `symbol.tsx` gives each graph kind a Lucide icon, always with `sr-only` kind text: `Box` for Type, `SquareFunction` for Method, `Variable` for Term, `Package` for Namespace, `Hash` for Macro, and `Code` otherwise. In the UI the kinds are named in plain words: Type, Function, Variable, Namespace, Macro, with plural chip labels ("Functions"). Paths use `PathLabel`, where the directory truncates first so `basename:line` stays visible.
+`SymbolIcon` from `symbol.tsx` gives each graph kind a Lucide icon, always with `sr-only` kind text: `Box` for Type, `SquareFunction` for Method, `Variable` for Term, `Package` for Namespace, `Hash` for Macro, `File` for the Code Graph's file nodes, and `Code` otherwise. In the UI the kinds are named in plain words: Type, Function, Variable, Namespace, Macro, with plural chip labels ("Functions"). Paths use `PathLabel`, where the directory truncates first so `basename:line` stays visible.
 
 ### Agent status dot
 
@@ -119,7 +120,24 @@ Everything is in the hash: `#/search?q=<text>&kind=<label>&name=&file=&line=<sym
    - With nothing selected, it shows a centered muted hint and the project root.
 3. **Peek panel**: the Agents source panel (`SourcePanel`), loading the file from `/api/file`. The graph has no lines for references, so nothing is highlighted there.
 - The definition in the Source tab uses the same blue highlight as Agents (see "Code highlight" under the Agents page).
-- If no graph is loaded (503), the page shows "The graph isn’t loaded." with the `pnpm graph sync` command.
+- If no graph is loaded (503), the page shows "The graph isn’t loaded." with the `pnpm graph sync` command (`GraphUnavailable`, which Code Graph shares).
+- The symbol header ends with a ghost `Waypoints` link, "Show in Code Graph", that opens the symbol on the Code Graph page.
+
+### Code Graph page
+
+Interactive exploration of the graph, drawn with [Cytoscape.js](https://js.cytoscape.org) and the fCoSE layout. `#/graph?name=&file=&line=` (or `?id=<node id>`) opens on that symbol; otherwise the page keeps whatever graph you left, for the session. Three columns, like Search:
+1. **Tools** (320px; on mobile a block above the canvas, at most 45% of the height). A tab bar with "Explore" and "Path".
+ - **Explore**: a raised `InputGroup`, "Find a symbol or file…" (Enter takes the first result, Escape clears it), over rows like Search's: `SymbolIcon`, the mono name (a file's basename), and the `PathLabel` underneath. Results already on the graph say "shown". Picking one adds it with its neighbors and selects it. With no query it shows "Search N symbols across M files." and "On the graph · N", the shown nodes, which select and center the node.
+ - **Path**: "From" and "To" fields, each a search like Explore's, or "Use <selected node>". A chosen end shows as a raised field with its icon, name and a clear `X`. A ghost `ArrowDownUp` swaps them. "Direction" chips ("Any", "Follow arrows") and "Through" chips ("Uses", "Nesting", "Files", the legend's three line kinds), then a full-width `primary` "Find path" (`Route`). A found path lists its stops as node rows, with the edge between each pair ("↓ uses", "↑ referenced in") and a "Clear" ghost button. With none: "No path within 12 steps." A muted note says paths skip external symbols.
+2. **Canvas**: the graph, with a row of raised icon buttons top right (zoom in and out, "Fit to view", "Rearrange", "Clear graph", each with a tooltip), a spinner top left while requests run, and the legend bottom left. Empty, it says "Start from a symbol or file." with how expanding works.
+3. **Inspector** (320px, over everything on mobile), for the selected node. A 44px header with its icon, mono name, a ghost `Trash2` (remove from the graph) and close `X`. Then the kind ("Function", "External function", "Test file") and `PathLabel` or package; `outline` buttons "Expand" / "Collapse", "Symbols" (opens it in Search), "Path from here" and "Path to here". Then one toggle row per edge group ("Uses 89", "Used by", "Defined in", "Imports"…) with `CirclePlus` / `CircleMinus`: the row gets the `accent` fill while its group is shown, reads "10 of 89" when only some are, and "More" loads up to 200. Last, a symbol's definition as a bordered `CodeLines` snippet.
+
+How the graph behaves:
+- **Nodes** are drawn as the app's raised chips (border, 2px lip, `rounded-md`): the kind icon, the mono name (cut at 28 characters) and a badge, `CirclePlus` when it has hidden neighbors or `CircleMinus` once expanded. Clicking the badge or double-clicking the node expands or collapses it; clicking elsewhere selects it. The selected chip sinks with the `accent` fill and a blue border, like a toggled key. External symbols have a dashed border and muted text. Nodes can be dragged. Chips are SVG images built at runtime from the theme's CSS variables, so the palette still lives only in `style.css`.
+- **Expanding** shows up to 10 neighbors per edge group (project code first, busiest edges first), and the edges between every shown node. **Collapsing** hides what that expansion brought in, recursively, unless something else keeps it: the user added it, another expanded node shows it, or it's on the path. Parameters are never shown.
+- **Edges**: arrows from source to target in muted neutral-33. Solid lines are uses (`USES`, `IMPLEMENTS`, `TYPE_OF`), dashed are nesting (`CONTAINS`, `DEFINES`) and dotted are files (`REFERENCES`, `IMPORTS`). Hovering an edge shows its label ("uses"); edges at the selected node are darker.
+- **Paths**: the server's bidirectional breadth-first search finds one of the shortest paths, up to 12 steps, through the chosen edge kinds and never through external symbols. Its nodes and edges turn blue (the code highlight's tint and edge on chips, labeled 2px edges), everything else fades, and the view frames the path.
+- **Layout**: new nodes start beside a shown neighbor, then fCoSE settles everything while the expanded node stays put, overlapping chips are pushed apart, and nodes animate to their places. The view follows new nodes when they land outside it, never zooming past 125%. "Rearrange" lays everything out from scratch. With reduced motion nothing animates.
 
 ### Explain chat
 
