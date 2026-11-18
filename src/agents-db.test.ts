@@ -1,6 +1,6 @@
-import { Database } from "@relate/relate";
 import { describe, expect, it } from "vitest";
 import { type AgentRecord, AgentsDb } from "./agents-db.js";
+import { openStore } from "./store.js";
 
 const agent = (over: Partial<AgentRecord> = {}): AgentRecord => ({
   id: "a1",
@@ -22,15 +22,17 @@ const agent = (over: Partial<AgentRecord> = {}): AgentRecord => ({
   ...over,
 });
 
+const open = () => new AgentsDb(openStore(":memory:"));
+
 describe("AgentsDb", () => {
   it("round-trips agents, turns in order and history", () => {
-    const db = new AgentsDb(Database.open(":memory:"));
+    const db = open();
     db.save(agent());
     expect(db.load()).toEqual([agent()]);
   });
 
   it("replaces turns on save and lists newest first", () => {
-    const db = new AgentsDb(Database.open(":memory:"));
+    const db = open();
     db.save(agent());
     db.save(agent({ status: "ready", turns: [{ type: "user", text: "Hi" }] }));
     db.save(agent({ id: "a2", createdAt: 5000 }));
@@ -39,13 +41,11 @@ describe("AgentsDb", () => {
     expect(first).toMatchObject({ status: "ready", turns: [{ type: "user", text: "Hi" }] });
   });
 
-  it("deletes an agent with its turns", () => {
-    const store = Database.open(":memory:");
-    const db = new AgentsDb(store);
+  it("deletes an agent", () => {
+    const db = open();
     db.save(agent());
     db.save(agent({ id: "a2" }));
     db.delete("a1");
     expect(db.load().map((a) => a.id)).toEqual(["a2"]);
-    expect(store.connect().query("MATCH (t:Turn) RETURN t").rows).toHaveLength(agent().turns.length);
   });
 });

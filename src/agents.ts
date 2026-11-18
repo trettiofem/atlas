@@ -111,7 +111,6 @@ async function run(agent: AgentRecord, prompt: string) {
     if (exists(agent)) {
       settle(agent);
       db.save(agent);
-      db.checkpoint();
       notify(agent);
     }
   }
@@ -159,7 +158,6 @@ export function deleteAgent(id: string): boolean {
   if (!agents.delete(id)) return false;
   runs.get(id)?.abort();
   db.delete(id);
-  db.checkpoint();
   for (const listener of listeners) listener({ type: "delete", id });
   return true;
 }

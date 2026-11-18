@@ -267,7 +267,7 @@ server.registerTool(
       const files = unique(args.files?.map((f) => toProjectRelative(root, f)));
       try {
         for (const f of files) resolveInRoot(root, f);
-        const { replaced } = await saveArtifact({ ...args, project: root, files, symbols: unique(args.symbols) });
+        const { replaced } = saveArtifact({ ...args, project: root, files, symbols: unique(args.symbols) });
         return ok({ saved: args.topic, replaced });
       } catch (e) {
         return fail(`Couldn't save the artifact: ${e instanceof Error ? e.message : String(e)}`);

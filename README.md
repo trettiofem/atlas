@@ -115,13 +115,13 @@ loaded project's root and survive `pnpm graph sync`. The MCP instructions and th
 [code-graph skill](.claude/skills/code-graph/SKILL.md) tell agents to look for artifacts first and to save one
 after a long investigation.
 
-> **Warning: artifact storage is a temporary solution.** Artifacts are saved in a third embedded RelateDB store,
-> `artifacts-db/` (git-ignored), separate from the code graph in `graph-db/` and from `agents-db/`. Each artifact
-> is one `Artifact` node with its files and symbols as list properties, not as edges into the graph. RelateDB allows
-> one writer process, and `@relate/relate` 1.1.0 can't close a database, so every save spawns a short-lived
-> writer process (`tsx src/artifacts-db.ts save`) and retries while another save holds the store. There is no
-> history, authorship or review: whatever an agent writes is served to the next one, and a save overwrites the
-> topic. This store will be replaced, so don't build on its format. See [src/artifacts-db.ts](src/artifacts-db.ts).
+Artifacts are rows of the `artifacts` table in `atlas.db` (git-ignored), a SQLite file opened with Node's built-in
+`node:sqlite` ([src/store.ts](src/store.ts)) and shared with the agents. It's separate from the code graph in
+`graph-db/`. Files and symbols are JSON columns, not edges into the graph. The file is in WAL mode with a busy
+timeout, so every MCP server process writes it directly.
+
+> **Warning: artifacts have no history, authorship or review.** Whatever an agent writes is served to the next one,
+> and a save overwrites the topic. See [src/artifacts-db.ts](src/artifacts-db.ts).
 
 The [code-graph skill](.claude/skills/code-graph/SKILL.md) tells agents when to use these tools instead of
 grep, which workflows to follow, and the graph's blind spots. To run the server by hand, use
@@ -177,11 +177,12 @@ with the MCP client SDK (the same command as `.mcp.json`), so agents get exactly
 does, plus a local `show_code` tool that puts a file's lines into the transcript. Each tool call is a step in the
 transcript, and answers stream in as markdown.
 
-> **Warning: agent storage is a temporary solution.** Agents are saved in a second embedded RelateDB store,
-> `agents-db/` (git-ignored), separate from the code graph in `graph-db/`. Each agent is an `Agent` node with its
-> `Turn` nodes, and its Anthropic message history is a JSON string property. Every save rewrites all of an agent's
-> turns. The web server is the store's only writer, so only one `pnpm web` can run at a time. Replace it with a
-> proper store before agents have several users. See [src/agents-db.ts](src/agents-db.ts).
+Agents are rows of the `agents` table in `atlas.db`, the SQLite file artifacts use. Each row holds the agent's
+turns and its Anthropic message history as JSON columns, and every save rewrites them. The web server keeps
+agents in memory and saves them as they change, so run one `pnpm web` at a time.
+
+> **Warning: agents have no owner yet.** Every agent shows the mock user as its creator. Add users before agents
+> have several. See [src/agents-db.ts](src/agents-db.ts).
 
 If the server stops while an agent works, the agent is marked interrupted on the next start and can take a follow-up.
 
@@ -196,6 +197,6 @@ Other commands: `index [file]`, `load [file]`, `sync`. Run `pnpm graph` with no 
 
 Sources: `src/main.ts` (CLI entry point), `src/mcp.ts` (MCP server), `src/web.ts` + `src/api.ts` (web UI server),
 `web/` (React UI), `src/queries.ts` (Cypher queries shared by
-all three), `src/graph.ts` (the Code Graph page's queries and path search), `src/source.ts` (source slicing), `src/artifacts-db.ts` (artifact store), `src/index.ts` (runs scip-typescript), `src/parse.ts`
+all three), `src/graph.ts` (the Code Graph page's queries and path search), `src/source.ts` (source slicing), `src/store.ts` (the SQLite file for agents and artifacts), `src/agents-db.ts` (agent store), `src/artifacts-db.ts` (artifact store), `src/index.ts` (runs scip-typescript), `src/parse.ts`
 (SCIP -> graph), `src/load.ts` (graph -> RelateDB), `src/db.ts` (store access), `src/types.ts` (SCIP and graph
 types), `src/languages.ts` (per-language rules), `schemas/graph.cypher` (graph schema).

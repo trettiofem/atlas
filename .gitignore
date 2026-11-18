@@ -3,6 +3,5 @@ example-project/
 index.scip
 .env
 graph-db/
-agents-db/
-artifacts-db/
+atlas.db*
 .pnpm-store/

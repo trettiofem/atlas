@@ -1,13 +1,9 @@
-// shortcut: agents are stored in a second embedded RelateDB store (agents-db/), separate from the code graph, with
-// the Anthropic message history as a JSON string property and every save rewriting all of an agent's turns. It's a
-// stopgap to keep agents across restarts: move them to a proper store (with users, and history that isn't a blob)
-// before more than one person or process uses them.
-import { fileURLToPath } from "node:url";
+// shortcut: agents have no owner (the web UI shows a mock creator), and every save rewrites an agent's turns and
+// history as JSON columns. Add users before more than one person uses them.
+import type { DatabaseSync } from "node:sqlite";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
-import { type Connection, Database, type ParamValue } from "@relate/relate";
 import type { Turn } from "./agent.js";
-
-export const AGENTS_DB_PATH = fileURLToPath(new URL("../agents-db", import.meta.url));
+import { openStore } from "./store.js";
 
 export type AgentStatus = "ready" | "working";
 
@@ -26,89 +22,71 @@ export interface AgentRecord {
   history: MessageParam[];
 }
 
-type TurnRow = { seq: number; type: string; text?: string; kind?: string; label?: string; durationMs?: number; path?: string; from?: number; to?: number };
-
-const toRow = (turn: Turn, seq: number): TurnRow => {
-  const { lines, ...rest } = turn as Turn & { lines?: [number, number] };
-  return { seq, ...rest, ...(lines && { from: lines[0], to: lines[1] }) };
+type AgentRow = {
+  id: string;
+  title: string;
+  description: string;
+  named: number;
+  status: string;
+  created_at: number;
+  updated_at: number;
+  turns: string;
+  history: string;
 };
 
-function fromRow(row: TurnRow): Turn {
-  switch (row.type) {
-    case "user":
-    case "answer":
-    case "error":
-      return { type: row.type, text: row.text ?? "" };
-    case "step":
-      return { type: "step", kind: row.kind === "graph" ? "graph" : "thought", label: row.label ?? "", durationMs: row.durationMs ?? 0 };
-    default:
-      return { type: "file", path: row.path ?? "", ...(row.from != null && row.to != null && { lines: [row.from, row.to] as [number, number] }) };
-  }
-}
-
-/** Drops undefined values, which RelateDB parameters can't hold. */
-const params = (obj: object) => JSON.parse(JSON.stringify(obj)) as { [key: string]: ParamValue };
-
-/** The agents store. One writer: the web server opens it once and keeps it. */
+/** The agents table. One writer: the web server opens it once and keeps it. */
 export class AgentsDb {
-  private readonly conn: Connection;
-
-  constructor(private readonly db: Database) {
-    this.conn = db.connect();
-    this.conn.query("CREATE CONSTRAINT agent_id IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE");
+  constructor(private readonly db: DatabaseSync) {
+    db.exec(`CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL,
+      named INTEGER NOT NULL, status TEXT NOT NULL,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      turns TEXT NOT NULL, history TEXT NOT NULL
+    )`);
   }
 
-  static open(path = AGENTS_DB_PATH) {
-    return new AgentsDb(Database.open(path));
+  static open(path?: string) {
+    return new AgentsDb(openStore(path));
   }
 
   load(): AgentRecord[] {
-    const { rows } = this.conn.query(
-      `MATCH (a:Agent)
-       OPTIONAL MATCH (a)-[:HAS_TURN]->(t:Turn)
-       WITH a, t ORDER BY t.seq
-       RETURN a {.*} AS agent, collect(t {.*}) AS turns
-       ORDER BY agent.createdAt DESC`,
-    );
-    return rows.map((row) => {
-      const a = row.agent as Record<string, unknown>;
-      return {
-        id: String(a.id),
-        title: String(a.title),
-        description: String(a.description),
-        named: a.named !== false,
-        status: a.status === "working" ? "working" : "ready",
-        createdAt: Number(a.createdAt),
-        updatedAt: Number(a.updatedAt),
-        history: JSON.parse(String(a.history ?? "[]")),
-        turns: (row.turns as TurnRow[]).map(fromRow),
-      };
-    });
+    const rows = this.db.prepare("SELECT * FROM agents ORDER BY created_at DESC").all() as AgentRow[];
+    return rows.map((a) => ({
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      named: a.named !== 0,
+      status: a.status === "working" ? "working" : "ready",
+      createdAt: a.created_at,
+      updatedAt: a.updated_at,
+      turns: JSON.parse(a.turns),
+      history: JSON.parse(a.history),
+    }));
   }
 
   save(agent: AgentRecord) {
-    const { turns, history, ...props } = agent;
-    this.conn.begin();
-    try {
-      this.conn.query("MERGE (a:Agent {id: $id}) SET a += $props", { id: agent.id, props: params({ ...props, history: JSON.stringify(history) }) });
-      this.conn.query("MATCH (:Agent {id: $id})-[:HAS_TURN]->(t:Turn) DETACH DELETE t", { id: agent.id });
-      this.conn.query("MATCH (a:Agent {id: $id}) UNWIND $turns AS turn CREATE (a)-[:HAS_TURN]->(t:Turn) SET t = turn", {
-        id: agent.id,
-        turns: params(turns.map(toRow)) as unknown as ParamValue[],
-      });
-      this.conn.commit();
-    } catch (e) {
-      this.conn.rollback();
-      throw e;
-    }
+    this.db
+      .prepare(
+        `INSERT INTO agents (id, title, description, named, status, created_at, updated_at, turns, history)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET title = excluded.title, description = excluded.description,
+           named = excluded.named, status = excluded.status, updated_at = excluded.updated_at,
+           turns = excluded.turns, history = excluded.history`,
+      )
+      .run(
+        agent.id,
+        agent.title,
+        agent.description,
+        agent.named ? 1 : 0,
+        agent.status,
+        agent.createdAt,
+        agent.updatedAt,
+        JSON.stringify(agent.turns),
+        JSON.stringify(agent.history),
+      );
   }
 
   delete(id: string) {
-    this.conn.query("MATCH (a:Agent {id: $id}) OPTIONAL MATCH (a)-[:HAS_TURN]->(t:Turn) DETACH DELETE a, t", { id });
-  }
-
-  /** Compacts the write-ahead log, which otherwise grows with every save. */
-  checkpoint() {
-    this.db.checkpoint();
+    this.db.prepare("DELETE FROM agents WHERE id = ?").run(id);
   }
 }

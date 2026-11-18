@@ -1,6 +1,9 @@
-import { Database } from "@relate/relate";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type ArtifactInput, ArtifactsDb } from "./artifacts-db.js";
+import { openStore } from "./store.js";
 
 const input = (over: Partial<ArtifactInput> = {}): ArtifactInput => ({
   project: "/repo",
@@ -12,7 +15,7 @@ const input = (over: Partial<ArtifactInput> = {}): ArtifactInput => ({
   ...over,
 });
 
-const open = () => new ArtifactsDb(Database.open(":memory:").connect()).init();
+const open = () => new ArtifactsDb(openStore(":memory:"));
 
 describe("ArtifactsDb", () => {
   it("round-trips an artifact", () => {
@@ -49,5 +52,19 @@ describe("ArtifactsDb", () => {
     expect(topics({ file: "src/load.ts" })).toEqual(["Graph loading"]);
     expect(topics({ symbol: "findPath" })).toEqual(["Path search"]);
     expect(topics({ limit: 1 })).toEqual(["Path search"]);
+  });
+
+  it("lets two connections to one file both write", () => {
+    const dir = mkdtempSync(join(tmpdir(), "artifacts-"));
+    try {
+      const path = join(dir, "atlas.db");
+      const a = new ArtifactsDb(openStore(path));
+      const b = new ArtifactsDb(openStore(path));
+      a.save(input({ topic: "From a" }), 1000);
+      b.save(input({ topic: "From b" }), 2000);
+      expect(a.find({ project: "/repo" }).map((x) => x.topic)).toEqual(["From b", "From a"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
