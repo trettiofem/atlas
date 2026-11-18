@@ -54,6 +54,16 @@ describe("ArtifactsDb", () => {
     expect(topics({ limit: 1 })).toEqual(["Path search"]);
   });
 
+  it("deletes an artifact by project and topic", () => {
+    const db = open();
+    db.save(input());
+    db.save(input({ project: "/other" }));
+    expect(db.delete("/repo", "Graph loading")).toBe(true);
+    expect(db.delete("/repo", "Graph loading")).toBe(false);
+    expect(db.find({ project: "/repo" })).toEqual([]);
+    expect(db.find({ project: "/other" })).toHaveLength(1);
+  });
+
   it("lets two connections to one file both write", () => {
     const dir = mkdtempSync(join(tmpdir(), "artifacts-"));
     try {

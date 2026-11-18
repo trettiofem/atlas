@@ -1,6 +1,7 @@
-import { BookSearch, Bot, House, type LucideIcon, Waypoints } from "lucide-react";
+import { BookSearch, Bot, House, type LucideIcon, ScrollText, Waypoints } from "lucide-react";
 import { AgentIcon } from "@/agent-icon";
 import { useAgents } from "@/agents-store";
+import { artifactHref } from "@/api";
 import logo from "@/assets/Logo.svg";
 import wordmark from "@/assets/LogoWordmark.svg";
 import avatar from "@/assets/UserLarge.svg";
@@ -18,21 +19,23 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { USER } from "@/mock";
-import { useRecentSymbols } from "@/recent";
+import { useRecentArtifacts, useRecentSymbols } from "@/recent";
 import { SymbolIcon, searchHref } from "@/symbol";
 
-const LATEST_AGENTS = 5;
+const RECENT_AGENTS = 5;
 
 export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
   { path: "/", title: "Home", icon: House },
   { path: "/agents", title: "Agents", icon: Bot },
+  { path: "/artifacts", title: "Artifacts", icon: ScrollText },
   { path: "/search", title: "Symbols", icon: BookSearch },
   { path: "/graph", title: "Code Graph", icon: Waypoints },
 ];
 
-// Collapsed ("icon") mode: the mark replaces the wordmark, the trigger moves to the footer and Latest hides.
+// Collapsed ("icon") mode: the mark replaces the wordmark, the trigger moves to the footer and Recent hides.
 export function AppSidebar({ route }: { route: string }) {
   const symbols = useRecentSymbols();
+  const artifacts = useRecentArtifacts();
   const { agents } = useAgents();
   return (
     <Sidebar collapsible="icon">
@@ -59,7 +62,7 @@ export function AppSidebar({ route }: { route: string }) {
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel>Latest</SidebarGroupLabel>
+          <SidebarGroupLabel>Recent</SidebarGroupLabel>
           <SidebarMenu>
             {symbols.map((s) => (
               <SidebarMenuItem key={`${s.file}:${s.line}:${s.name}`}>
@@ -71,7 +74,17 @@ export function AppSidebar({ route }: { route: string }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-            {agents.slice(0, LATEST_AGENTS).map((a) => (
+            {artifacts.map((topic) => (
+              <SidebarMenuItem key={topic}>
+                <SidebarMenuButton asChild>
+                  <a href={artifactHref(topic)} title={topic}>
+                    <ScrollText className="text-muted-foreground" />
+                    <span>{topic}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+            {agents.slice(0, RECENT_AGENTS).map((a) => (
               <SidebarMenuItem key={a.id}>
                 <SidebarMenuButton asChild>
                   <a href={`#/agents/${a.id}`}>

@@ -338,7 +338,7 @@ function SymbolRow({ symbol, href, current }: { symbol: SymbolHit; href: string;
 }
 
 /** A file that opens in the peek panel. `note` sits on the right, `detail` underneath. */
-function FileRow({ file, note, detail, current, onOpen }: { file: string; note?: string; detail?: ReactNode; current: boolean; onOpen: () => void }) {
+export function FileRow({ file, note, detail, current, onOpen }: { file: string; note?: string; detail?: ReactNode; current: boolean; onOpen: () => void }) {
   return (
     <button
       type="button"

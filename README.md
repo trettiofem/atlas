@@ -115,6 +115,10 @@ loaded project's root and survive `pnpm graph sync`. The MCP instructions and th
 [code-graph skill](.claude/skills/code-graph/SKILL.md) tell agents to look for artifacts first and to save one
 after a long investigation.
 
+In the web UI, the Artifacts page lists them, renders their markdown, flags stale files and deletes them. It
+reads `GET /api/artifacts` (every artifact of the loaded project, with its `staleFiles`) and deletes with
+`DELETE /api/artifacts?topic=<topic>`. There's no editing: agents write artifacts, people read and prune them.
+
 Artifacts are rows of the `artifacts` table in `atlas.db` (git-ignored), a SQLite file opened with Node's built-in
 `node:sqlite` ([src/store.ts](src/store.ts)) and shared with the agents. It's separate from the code graph in
 `graph-db/`. Files and symbols are JSON columns, not edges into the graph. The file is in WAL mode with a busy

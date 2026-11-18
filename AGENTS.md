@@ -10,8 +10,8 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - [src/web.ts](src/web.ts) is the Vite config. It is inline with `configFile: false` and sets the Tailwind plugin and the `@` → `web/` alias. There is no `vite.config.ts`.
 - shadcn components are in `web/components/ui/` and `cn` is in `web/lib/utils.ts`. These files are ours to edit. The shadcn CLI doesn't run in this layout (no `package.json` in `web/`). To add a component, fetch `https://ui.shadcn.com/r/styles/new-york-v4/<name>.json`, write its `files[].content`, rewrite `@/registry/new-york-v4/ui/` → `@/components/ui/` and `"cn"` → `"@/lib/utils"`, and add its npm `dependencies` at the repo root.
 - Theme tokens are in [web/style.css](web/style.css).
-- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/graph[?<params>]`. It also sets the document title from the route: the open symbol or agent, then the page, then "Atlas" (`_minColorDistance · Symbols · Atlas`). Home is just "Atlas".
-- Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx), [web/agents.tsx](web/agents.tsx) and [web/graph.tsx](web/graph.tsx) (Code Graph).
+- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/artifacts[/<topic>]`, `#/graph[?<params>]`. It also sets the document title from the route: the open symbol, agent or artifact, then the page, then "Atlas" (`_minColorDistance · Symbols · Atlas`). Home is just "Atlas".
+- Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx), [web/agents.tsx](web/agents.tsx), [web/artifacts.tsx](web/artifacts.tsx) and [web/graph.tsx](web/graph.tsx) (Code Graph).
 - Shared components:
   - [web/app-sidebar.tsx](web/app-sidebar.tsx).
   - [web/prompt-box.tsx](web/prompt-box.tsx): the prompt box on Home and Agents.
@@ -28,7 +28,7 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - **Agents and the Explain chat** run on the server with the Anthropic Messages API, Haiku by default (`CLAUDE_MODEL` overrides it), using the key in `.env` (`CLAUDE_API_KEY`). [src/agent.ts](src/agent.ts) is the run loop. It starts [src/mcp.ts](src/mcp.ts) as an MCP client over stdio, so Claude gets the same code-graph tools as Claude Code, plus a local `show_code` tool that adds a file reference with its lines to the transcript. [src/agents.ts](src/agents.ts) keeps agents in memory, streams changes, and recovers agents a stopped server left working.
 - **Agents storage**: [src/agents-db.ts](src/agents-db.ts) saves agents in SQLite, in the `agents` table of `atlas.db` (git-ignored, opened by [src/store.ts](src/store.ts) and shared with artifacts), separate from the code graph. Turns and the Anthropic history are JSON columns. Agents have no owner yet; add users before agents have several.
 - **Mock data**: only the user (`USER` in [web/mock.tsx](web/mock.tsx)), shown in the sidebar footer and as every agent's creator.
-- **Recent symbols**: [web/recent.ts](web/recent.ts) keeps the last 5 symbols opened in Search in localStorage, for "Latest".
+- **Recent symbols and artifacts**: [web/recent.ts](web/recent.ts) keeps the last 5 symbols opened in Search and the last 5 artifacts opened (picked, not the newest shown by default; deleting one drops it) in localStorage, for "Recent".
 
 ### Design tokens
 
@@ -84,13 +84,14 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 - On mobile it becomes a sheet, opened by a trigger at the top of the page.
 - **Expanded**:
   - Header: `LogoWordmark.svg` on the left and the collapse trigger on the right.
-  - Nav: Home (`House`), Agents (`Bot`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
-  - "Latest": the symbols and agents the user last touched. Symbols (the last 5 opened in Search) come first, with their `SymbolIcon` and mono text, and link back to Search. Agents (the 5 newest) show `AgentIcon` and sans text. All entries truncate with an ellipsis.
+  - Nav: Home (`House`), Agents (`Bot`), Artifacts (`ScrollText`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
+  - "Recent": the symbols, artifacts and agents the user last touched. Symbols (the last 5 opened in Search) come first, with their `SymbolIcon` and mono text, and link back to Search. Artifacts (the last 5 opened) follow, with `ScrollText` and the topic in sans text. Agents (the 5 newest) show `AgentIcon` and sans text. All entries truncate with an ellipsis.
   - Footer: the user, with the 24px `UserLarge.svg` avatar, the name in `font-medium` and the muted org underneath. It's mock data (`USER` in `mock.tsx`) and does nothing yet.
-- **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Latest" hidden, and at the bottom the avatar above the trigger.
+- **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Recent" hidden, and at the bottom the avatar above the trigger.
 - What the nav items do:
   - Home: start a chat. Sending a prompt creates an agent and opens the Agents page.
   - Agents: create and manage agents that search the code base.
+  - Artifacts: read and delete the write-ups agents saved.
   - Symbols: find symbols.
   - Code Graph: interactive graph exploration.
 
@@ -144,7 +145,7 @@ How the graph behaves:
 
 ### Explain chat
 
-A one-time chat about highlighted code. It isn't an agent: it doesn't show on the Agents page or in "Latest", and closing it ends the chat. Each open starts fresh.
+A one-time chat about highlighted code. It isn't an agent: it doesn't show on the Agents page or in "Recent", and closing it ends the chat. Each open starts fresh.
  - **Tip**: `ExplainTip` is passed as `highlightAction` to `CodeLines`, `SourceText` or `SourcePanel`, which put the highlighted lines in one `group/highlight` block.
   - It looks like the app's tooltips (`bg-foreground`, `text-background`, `text-xs`, `rounded-md`, with an arrow) plus a `Sparkles` icon and "Explain". It sits flush on top of the highlight, at the start of the code column.
   - It shows while the highlight or the tip is hovered, and on keyboard focus, so it's a real button that Tab reaches.
@@ -161,7 +162,7 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
 1. **Agent list** (320px, hidden on mobile):
  - A top block (`border-b p-4`): a raised `InputGroup` like Search's (a `Search` icon and "Find an agent…") and, beside it, a square `primary` icon button (`Plus`, `aria-label` "Create") that opens a new conversation (`#/agents/new`). The field filters the list as you type (Escape clears it) with `fuzzyFilter` from [web/fuzzy.ts](web/fuzzy.ts). Every query word has to match a word in the title, description or creator's name, by prefix, inside the word, with letters missing or with a typo, and title matches rank first. With no match it says "No agents match “x”."
  - Each agent shows an `AgentIcon`, then its bold one-line title. The description sits underneath, indented to line up with the title, and is cut off after 6 lines.
- - Claude names a new agent from its prompt, which takes a second or two. Until then (`named` is false), the title and description are skeleton lines (`bg-border`, since `bg-accent` vanishes on the open row). The conversation header and "Latest" show skeletons the same way. If naming fails or the server restarts, the prompt stays as the name.
+ - Claude names a new agent from its prompt, which takes a second or two. Until then (`named` is false), the title and description are skeleton lines (`bg-border`, since `bg-accent` vanishes on the open row). The conversation header and "Recent" show skeletons the same way. If naming fails or the server restarts, the prompt stays as the name.
  - Under the `AgentIcon`, level with the description's first line, the 12px `User.svg` avatar shows who created the agent (`creator`, with "Created by …" as its alt text and tooltip). For now it's always the mock `USER`.
    - A border separates agents. The open agent gets the `accent` fill.
 2. **Conversation**:
@@ -180,6 +181,19 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
    - Mono `text-xs` code with a muted, right-aligned line-number gutter. Long lines scroll sideways.
    - The reference's lines are highlighted and scrolled to the center each time it's opened. Hovering the highlight shows the Explain tip, like Search's Source tab. With no symbol name, the Explain dialog's header uses the file's basename.
    - **Code highlight** (from `CodeLines` in `source.tsx`, the same in the snippet, the panel and Search's Source tab): a `bg-blue/10` tint across the full line width plus a 2px `border-blue` left edge. Blue means "look here": the lines the agent points at, or the definition of the symbol you picked.
+
+### Artifacts page
+
+The write-ups agents save with `save_artifact` (see the README), for reading and deleting. Agents write them, so there's no Create. `#/artifacts/<topic>` opens one (the topic is URI-encoded, since topics are unique per project), and `#/artifacts` opens the newest on desktop and just the list on mobile. Data comes from `GET /api/artifacts` (every artifact with its `staleFiles`). Without a graph it shows `GraphUnavailable`, since artifacts belong to the loaded project's root. With none it says "No artifacts yet. Agents save one after a long investigation." Three columns like Agents:
+1. **List** (320px; on mobile the whole page until an artifact is open):
+   - A top block (`border-b p-4`) with a raised `InputGroup`, "Find an artifact…", filtering with `fuzzyFilter` on the topic, summary, files and symbols (Escape clears it). With no match: "No artifacts match “x”."
+   - Rows: `ScrollText`, the bold one-line topic, the summary underneath (cut after 3 lines), and a muted line with the day it was last updated, plus "· 2 files changed" when covered files changed since it was saved. A border separates rows, and the open one gets the `accent` fill.
+2. **Artifact view**:
+   - Header (44px): on mobile an `ArrowLeft` back to the list, `ScrollText`, the topic in `font-medium`, and a ghost `Trash2` ("Delete artifact"). It asks first, like deleting an agent ("Delete this artifact?"), then sends `DELETE /api/artifacts?topic=`, drops it from the list and opens the newest.
+   - The muted summary and "Updated <date>", then the markdown. Unlike answers it keeps its headings (`font-bold tracking-tight`, a markdown `#` is an `h2` under the topic). Lists, links and code blocks are the chat's (`MARKDOWN` in `chat.tsx`).
+   - "Files": a bordered box of Search's `FileRow`s, with "changed since" on the right for stale files. They open the source panel.
+   - "Symbols": `outline` mono chips that open Search with the name in the field and the symbol selected. Artifacts store only names, so a click looks the name up (`find`), preferring a definition in the artifact's files. With no match it only searches for the name.
+3. **Source panel**: `SourcePanel`, nothing highlighted, like Search's peek panel.
 
 ### Assets
 

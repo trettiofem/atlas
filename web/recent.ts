@@ -1,49 +1,68 @@
 import { useSyncExternalStore } from "react";
 import type { SymbolRef } from "@/symbol";
 
+const MAX = 5;
+
+/** A newest-first list of the last 5 items opened, in localStorage under `key`, for the sidebar's Recent list. */
+function recentList<T>(key: string, same: (a: T, b: T) => boolean) {
+  const change = `atlas:${key}`;
+  const parse = (raw: string | null): T[] => {
+    try {
+      const list = JSON.parse(raw ?? "[]");
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  };
+  const write = (list: T[]) => {
+    localStorage.setItem(key, JSON.stringify(list));
+    dispatchEvent(new Event(change));
+  };
+
+  // useSyncExternalStore compares snapshots by identity, so reparse only when the stored string changes.
+  let raw: string | null = null;
+  let snapshot: T[] = [];
+  const getSnapshot = () => {
+    const next = localStorage.getItem(key);
+    if (next !== raw) [raw, snapshot] = [next, parse(next)];
+    return snapshot;
+  };
+
+  // `storage` fires for changes made in other tabs.
+  const subscribe = (onChange: () => void) => {
+    addEventListener(change, onChange);
+    addEventListener("storage", onChange);
+    return () => {
+      removeEventListener(change, onChange);
+      removeEventListener("storage", onChange);
+    };
+  };
+
+  return {
+    /** Puts the item first. */
+    remember: (item: T) => write([item, ...parse(localStorage.getItem(key)).filter((x) => !same(x, item))].slice(0, MAX)),
+    forget: (item: T) => write(parse(localStorage.getItem(key)).filter((x) => !same(x, item))),
+    use: () => useSyncExternalStore(subscribe, getSnapshot),
+  };
+}
+
 export interface RecentSymbol extends SymbolRef {
   kind: string | null;
 }
 
-const KEY = "atlas.recentSymbols";
-const CHANGE = "atlas:recent-symbols";
-const MAX = 5;
+const symbols = recentList<RecentSymbol>("atlas.recentSymbols", (a, b) => a.name === b.name && a.file === b.file && a.line === b.line);
 
-const parse = (raw: string | null): RecentSymbol[] => {
-  try {
-    const list = JSON.parse(raw ?? "[]");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-};
-
-/** Puts the symbol first in the sidebar's Latest list. */
-export function rememberSymbol(symbol: RecentSymbol) {
-  const same = (s: RecentSymbol) => s.name === symbol.name && s.file === symbol.file && s.line === symbol.line;
-  const list = [symbol, ...parse(localStorage.getItem(KEY)).filter((s) => !same(s))].slice(0, MAX);
-  localStorage.setItem(KEY, JSON.stringify(list));
-  dispatchEvent(new Event(CHANGE));
-}
-
-// useSyncExternalStore compares snapshots by identity, so reparse only when the stored string changes.
-let raw: string | null = null;
-let snapshot: RecentSymbol[] = [];
-const getSnapshot = () => {
-  const next = localStorage.getItem(KEY);
-  if (next !== raw) [raw, snapshot] = [next, parse(next)];
-  return snapshot;
-};
-
-// `storage` fires for changes made in other tabs.
-const subscribe = (onChange: () => void) => {
-  addEventListener(CHANGE, onChange);
-  addEventListener("storage", onChange);
-  return () => {
-    removeEventListener(CHANGE, onChange);
-    removeEventListener("storage", onChange);
-  };
-};
+export const rememberSymbol = symbols.remember;
 
 /** The symbols last opened in Search, newest first. */
-export const useRecentSymbols = () => useSyncExternalStore(subscribe, getSnapshot);
+export const useRecentSymbols = symbols.use;
+
+const artifacts = recentList<string>("atlas.recentArtifacts", (a, b) => a === b);
+
+export const rememberArtifact = artifacts.remember;
+
+/** Drops a deleted artifact. */
+export const forgetArtifact = artifacts.forget;
+
+/** The topics of the artifacts last opened, newest first. */
+export const useRecentArtifacts = artifacts.use;

@@ -1,6 +1,8 @@
 // shortcut: artifacts have no versions, authors or review, and their files and symbols are JSON columns rather than
 // links into the graph. Add those before artifacts are relied on.
+import { stat } from "node:fs/promises";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+import { resolveInRoot } from "./source.js";
 import { openStore } from "./store.js";
 
 export interface ArtifactInput {
@@ -92,6 +94,19 @@ export class ArtifactsDb {
       updatedAt: a.updated_at,
     }));
   }
+
+  /** False if the project has no artifact with this topic. */
+  delete(project: string, topic: string): boolean {
+    return this.db.prepare("DELETE FROM artifacts WHERE project = ? AND topic = ?").run(project, topic).changes > 0;
+  }
+}
+
+/** The artifact's files that changed after it was saved, or no longer exist. */
+export async function staleFiles(root: string, artifact: Artifact) {
+  const changed = await Promise.all(
+    artifact.files.map((f) => stat(resolveInRoot(root, f)).then((s) => s.mtimeMs > artifact.updatedAt, () => true)),
+  );
+  return artifact.files.filter((_, i) => changed[i]);
 }
 
 let shared: ArtifactsDb | undefined;
@@ -100,3 +115,5 @@ const store = () => (shared ??= new ArtifactsDb(openStore()));
 export const findArtifacts = (filter: ArtifactFilter): Artifact[] => store().find(filter);
 
 export const saveArtifact = (artifact: ArtifactInput): { replaced: boolean } => store().save(artifact);
+
+export const deleteArtifact = (project: string, topic: string): boolean => store().delete(project, topic);

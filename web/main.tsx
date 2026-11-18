@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Agents, findAgent, NEW } from "@/agents";
 import { useAgents } from "@/agents-store";
 import { AppSidebar, NAV } from "@/app-sidebar";
+import { Artifacts, decodeTopic } from "@/artifacts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Graph } from "@/graph";
 import { Home } from "@/home";
@@ -23,9 +24,16 @@ function App() {
   const page = NAV.find((n) => n.path === path);
   const params = new URLSearchParams(query);
   const { agents } = useAgents();
+  const topic = path === "/artifacts" ? decodeTopic(id) : undefined;
   // "_minColorDistance · Symbols · Atlas", "Investigation into billing logic · Agents · Atlas", or just "Atlas" on Home.
   const subject =
-    path === "/search" || path === "/graph" ? params.get("name") : path === "/agents" ? (id === NEW ? "New agent" : findAgent(agents, id)?.title) : undefined;
+    path === "/search" || path === "/graph"
+      ? params.get("name")
+      : path === "/agents"
+        ? id === NEW
+          ? "New agent"
+          : findAgent(agents, id)?.title
+        : topic;
   const title = [subject, path === "/" ? undefined : (page?.title ?? "Not found"), "Atlas"].filter(Boolean).join(" · ");
   useEffect(() => {
     document.title = title;
@@ -43,6 +51,8 @@ function App() {
           <Search params={params} />
         ) : path === "/agents" ? (
           <Agents id={id} />
+        ) : path === "/artifacts" ? (
+          <Artifacts topic={topic} />
         ) : path === "/graph" ? (
           <Graph params={params} />
         ) : (

@@ -29,7 +29,7 @@ const STEP_ICON = { graph: Waypoints, thought: CircleCheck };
 export const formatDuration = (ms: number) => (ms < 1000 ? `${ms}ms` : `${Number((ms / 1000).toFixed(ms < 10_000 ? 1 : 0))}s`);
 
 // Answers are body text: inline code without a background, plain lists, no headings.
-const MARKDOWN: Components = {
+export const MARKDOWN: Components = {
   ul: ({ children }) => <ul className="list-disc space-y-1 pl-5">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal space-y-1 pl-5">{children}</ol>,
   a: ({ href, children }) => (

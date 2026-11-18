@@ -1,9 +1,8 @@
-import { stat } from "node:fs/promises";
 import type { Connection } from "@relate/relate";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { type Artifact, findArtifacts, saveArtifact } from "./artifacts-db.js";
+import { findArtifacts, saveArtifact, staleFiles } from "./artifacts-db.js";
 import { NOT_LOADED, reader } from "./db.js";
 import { getProject, overview, type QueryOptions, type Row, runQuery } from "./queries.js";
 import { readDefinitions, resolveInRoot, toProjectRelative } from "./source.js";
@@ -211,14 +210,6 @@ server.registerTool(
   },
   async (args) => queryTool("impact", args.name, { file: args.file }),
 );
-
-/** The artifact's files that changed after it was saved, or no longer exist. */
-async function staleFiles(root: string, artifact: Artifact) {
-  const changed = await Promise.all(
-    artifact.files.map((f) => stat(resolveInRoot(root, f)).then((s) => s.mtimeMs > artifact.updatedAt, () => true)),
-  );
-  return artifact.files.filter((_, i) => changed[i]);
-}
 
 const unique = (items: string[] = []) => [...new Set(items)];
 
