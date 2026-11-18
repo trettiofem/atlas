@@ -20,7 +20,7 @@ function App() {
   const path = `/${section}`;
   const page = NAV.find((n) => n.path === path);
   const params = new URLSearchParams(query);
-  // "_minColorDistance · Search · Atlas", "Investigation into billing logic · Agents · Atlas", or just "Atlas" on Home.
+  // "_minColorDistance · Symbols · Atlas", "Investigation into billing logic · Agents · Atlas", or just "Atlas" on Home.
   const subject = path === "/search" ? params.get("name") : path === "/agents" ? findAgent(id)?.title : undefined;
   const title = [subject, path === "/" ? undefined : (page?.title ?? "Not found"), "Atlas"].filter(Boolean).join(" · ");
   useEffect(() => {

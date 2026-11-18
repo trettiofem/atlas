@@ -10,7 +10,7 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - [src/web.ts](src/web.ts) is the Vite config. It is inline with `configFile: false` and sets the Tailwind plugin and the `@` → `web/` alias. There is no `vite.config.ts`.
 - shadcn components are in `web/components/ui/` and `cn` is in `web/lib/utils.ts`. These files are ours to edit. The shadcn CLI doesn't run in this layout (no `package.json` in `web/`). To add a component, fetch `https://ui.shadcn.com/r/styles/new-york-v4/<name>.json`, write its `files[].content`, rewrite `@/registry/new-york-v4/ui/` → `@/components/ui/` and `"cn"` → `"@/lib/utils"`, and add its npm `dependencies` at the repo root.
 - Theme tokens are in [web/style.css](web/style.css).
-- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/graph`. It also sets the document title from the route: the open symbol or agent, then the page, then "Atlas" (`_minColorDistance · Search · Atlas`). Home is just "Atlas".
+- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/graph`. It also sets the document title from the route: the open symbol or agent, then the page, then "Atlas" (`_minColorDistance · Symbols · Atlas`). Home is just "Atlas".
 - Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx) and [web/agents.tsx](web/agents.tsx). Code Graph is a placeholder.
 - Shared components:
   - [web/app-sidebar.tsx](web/app-sidebar.tsx).
@@ -80,14 +80,14 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 - On mobile it becomes a sheet, opened by a trigger at the top of the page.
 - **Expanded**:
   - Header: `LogoWordmark.svg` on the left and the collapse trigger on the right.
-  - Nav: Home (`House`), Search (`Search`), Agents (`Bot`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
+  - Nav: Home (`House`), Agents (`Bot`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
   - "Latest": the symbols and agents the user last touched. Symbols (the last 5 opened in Search) come first, with their `SymbolIcon` and mono text, and link back to Search. Agents show `AgentIcon` and sans text. All entries truncate with an ellipsis.
   - Footer: the user, with the 24px `UserLarge.svg` avatar, the name in `font-medium` and the muted org underneath. It's mock data (`USER` in `mock.tsx`) and does nothing yet.
 - **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Latest" hidden, and at the bottom the avatar above the trigger.
 - What the nav items do:
   - Home: start a chat. Sending a prompt creates an agent and opens the Agents page.
-  - Search: find symbols.
   - Agents: create and manage agents that search the code base.
+  - Symbols: find symbols.
   - Code Graph: interactive graph exploration.
 
 ### Home page

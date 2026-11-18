@@ -1,4 +1,4 @@
-import { Bot, House, type LucideIcon, Search, Waypoints } from "lucide-react";
+import { BookSearch, Bot, House, type LucideIcon, Waypoints } from "lucide-react";
 import { AgentIcon } from "@/agent-icon";
 import logo from "@/assets/Logo.svg";
 import wordmark from "@/assets/LogoWordmark.svg";
@@ -21,8 +21,8 @@ import { SymbolIcon, searchHref } from "@/symbol";
 
 export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
   { path: "/", title: "Home", icon: House },
-  { path: "/search", title: "Search", icon: Search },
   { path: "/agents", title: "Agents", icon: Bot },
+  { path: "/search", title: "Symbols", icon: BookSearch },
   { path: "/graph", title: "Code Graph", icon: Waypoints },
 ];
 
