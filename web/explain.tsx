@@ -41,27 +41,29 @@ export function ExplainDialog({
   name,
   file,
   text,
+  startLine = 1,
   lines,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   name: string;
   file: string;
-  /** The whole file; `lines` picks the code to explain. */
+  /** The file from `startLine` on; `lines` picks the code to explain. */
   text: string;
+  startLine?: number;
   lines: LineRange;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[min(40rem,85svh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         {/* Dialog content unmounts on close, so every open starts a fresh chat. */}
-        <ExplainChat name={name} file={file} text={text} lines={lines} />
+        <ExplainChat name={name} file={file} text={text} startLine={startLine} lines={lines} />
       </DialogContent>
     </Dialog>
   );
 }
 
-function ExplainChat({ name, file, text, lines }: { name: string; file: string; text: string; lines: LineRange }) {
+function ExplainChat({ name, file, text, startLine, lines }: { name: string; file: string; text: string; startLine: number; lines: LineRange }) {
   const [prompts, setPrompts] = useState(["Explain this code"]);
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
@@ -86,7 +88,7 @@ function ExplainChat({ name, file, text, lines }: { name: string; file: string; 
               {file}:{lines[0] === lines[1] ? lines[0] : lines.join("-")}
             </span>
           </p>
-          <CodeLines text={text} path={file} startLine={1} only={lines} highlight={lines} className="max-h-60 rounded-md border py-1.5" />
+          <CodeLines text={text} path={file} startLine={startLine} only={lines} highlight={lines} className="max-h-60 rounded-md border py-1.5" />
         </div>
         {prompts.map((prompt, i) => (
           <UserMessage key={i}>{prompt}</UserMessage>

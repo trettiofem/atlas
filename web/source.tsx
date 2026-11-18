@@ -18,11 +18,13 @@ export function SourcePanel({
   file,
   text,
   startLine,
+  highlightAction,
   onClose,
 }: {
   file: FileRef;
   text: string | null | undefined;
   startLine?: number;
+  highlightAction?: ReactNode;
   onClose: () => void;
 }) {
   return (
@@ -36,7 +38,7 @@ export function SourcePanel({
       </header>
       {text != null ? (
         // A fresh `file` per open, so reopening the same reference scrolls back to its lines.
-        <SourceText text={text} path={file.path} startLine={startLine} highlight={file.lines} reveal={file} className="flex-1 py-4" />
+        <SourceText text={text} path={file.path} startLine={startLine} highlight={file.lines} highlightAction={highlightAction} reveal={file} className="flex-1 py-4" />
       ) : (
         <p className="m-auto text-muted-foreground">{text === undefined ? "Loading…" : "Source not available."}</p>
       )}

@@ -124,7 +124,7 @@ Everything is in the hash: `#/search?q=<text>&kind=<label>&name=&file=&line=<sym
 ### Explain chat
 
 A one-time chat about highlighted code. It isn't an agent: it doesn't show on the Agents page or in "Latest", and closing it ends the chat. Each open starts fresh.
-- **Tip**: `ExplainTip` is passed as `highlightAction` to `CodeLines` or `SourceText`, which put the highlighted lines in one `group/highlight` block.
+ - **Tip**: `ExplainTip` is passed as `highlightAction` to `CodeLines`, `SourceText` or `SourcePanel`, which put the highlighted lines in one `group/highlight` block.
   - It looks like the app's tooltips (`bg-foreground`, `text-background`, `text-xs`, `rounded-md`, with an arrow) plus a `Sparkles` icon and "Explain". It sits flush on top of the highlight, at the start of the code column.
   - It shows while the highlight or the tip is hovered, and on keyboard focus, so it's a real button that Tab reaches.
   - When the highlight starts at the file's first line, it goes underneath instead.
@@ -153,7 +153,7 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
 3. **Source panel** (`min(30rem, 40%)`, covers the conversation on mobile):
    - A 44px header with the `File` icon, the mono path and a close `X`.
    - Mono `text-xs` code with a muted, right-aligned line-number gutter. Long lines scroll sideways.
-   - The reference's lines are highlighted and scrolled to the center each time it's opened.
+   - The reference's lines are highlighted and scrolled to the center each time it's opened. Hovering the highlight shows the Explain tip, like Search's Source tab. With no symbol name, the Explain dialog's header uses the file's basename.
    - **Code highlight** (from `CodeLines` in `source.tsx`, the same in the snippet, the panel and Search's Source tab): a `bg-blue/10` tint across the full line width plus a 2px `border-blue` left edge. Blue means "look here": the lines the agent points at, or the definition of the symbol you picked.
 
 ### Assets

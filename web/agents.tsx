@@ -4,6 +4,7 @@ import { AgentIcon } from "@/agent-icon";
 import avatar from "@/assets/User.svg";
 import { Step, UserMessage } from "@/chat";
 import { Button } from "@/components/ui/button";
+import { ExplainDialog, ExplainTip } from "@/explain";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { fuzzyFilter } from "@/fuzzy";
 import { AGENTS, type Agent, SOURCES, type Turn } from "@/mock";
@@ -82,6 +83,9 @@ export function Agents({ id }: { id?: string }) {
 function Conversation({ agent }: { agent: Agent }) {
   const [file, setFile] = useState<FileRef | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [explaining, setExplaining] = useState(false);
+  const source = file && SOURCES[file.path];
+  const lines = file?.lines;
   return (
     <>
       <section aria-label={agent.title} className="flex min-w-0 flex-1 flex-col">
@@ -100,7 +104,24 @@ function Conversation({ agent }: { agent: Agent }) {
         </div>
       </section>
       {file && (
-        <SourcePanel file={file} text={SOURCES[file.path]?.code ?? null} startLine={SOURCES[file.path]?.startLine} onClose={() => setFile(null)} />
+        <SourcePanel
+          file={file}
+          text={source?.code ?? null}
+          startLine={source?.startLine}
+          highlightAction={lines && source && <ExplainTip below={lines[0] === source.startLine} onClick={() => setExplaining(true)} />}
+          onClose={() => setFile(null)}
+        />
+      )}
+      {file && lines && source && (
+        <ExplainDialog
+          open={explaining}
+          onOpenChange={setExplaining}
+          name={file.path.split("/").pop()!}
+          file={file.path}
+          text={source.code}
+          startLine={source.startLine}
+          lines={lines}
+        />
       )}
     </>
   );
