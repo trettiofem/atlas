@@ -21,7 +21,14 @@ counts.
 - **You (or the user) have edited code since `loadedAt`:** results for the edited files may be stale. Re-run the
   sync if it matters for the task.
 
-## 2. Pick a tool
+## 2. Check for artifacts
+
+Artifacts are markdown write-ups that earlier agents saved after investigating part of the project. Before you
+dig into a component, call `find_artifacts` with a `query`, `file` or `symbol`. If one covers it, start from it
+instead of redoing the investigation. It's much cheaper. Results with `staleFiles` were written before those files
+last changed, so check the parts they cover against the current code.
+
+## 3. Pick a tool
 
 | Question | Tool |
 |---|---|
@@ -34,11 +41,13 @@ counts.
 | What does this file import, and what imports it? | `file_dependencies`, `file_dependents` |
 | Which tests cover X? | `tests_for` |
 | What breaks if I change X? | `impact` |
+| Has someone already explained this? | `find_artifacts` (`query`, `file`, `symbol`, `limit`) |
+| Keep what I learned for the next agent | `save_artifact` (`topic`, `summary`, `markdown`, `files`, `symbols`) |
 
 Results include `file` (project-relative) and `path` (absolute). Use `path` with Read or Edit. Tools accept
 either form for `file` inputs.
 
-## 3. Common workflows
+## 4. Common workflows
 
 **Understand a symbol**
 1. `search_symbols` to get the exact name, kind and file.
@@ -55,7 +64,16 @@ either form for `file` inputs.
 **Orient in a file or module**
 `outline`, then `file_dependencies` and `file_dependents`, then `get_source` on the symbols that matter.
 
-## 4. Caveats
+**Save an artifact after a long investigation**
+Save one when understanding a component took many calls and someone else is likely to need the same answer.
+Skip it for small or obvious findings, or for anything a single `get_source` would show.
+1. `find_artifacts` on the topic first. Saving an existing `topic` replaces it, so fold in what still holds.
+2. `save_artifact` with a short `topic`, a one-sentence `summary`, and the `files` and exact `symbols` it covers,
+   so later agents can find it by file or symbol and see when it goes stale.
+3. Write the `markdown` for agents: how the parts fit together, invariants, pitfalls, why it's built that way,
+   and where to look (symbol names and paths). Don't paste the source or restate what the code plainly says.
+
+## 5. Caveats
 
 - **Names aren't unique.** If a name-based tool returns several symbols (in different files, or a field and a
   method), repeat the call with `file` to pick one.
@@ -67,6 +85,9 @@ either form for `file` inputs.
   references to them aren't recorded.
 - **External code isn't included.** Symbols from dependencies (npm packages, the standard library) are
   references only, with no source.
-- **One project at a time.** Loading another project replaces the graph.
+- **One project at a time.** Loading another project replaces the graph. Artifacts are kept per project root and
+  survive syncs.
+- **Artifacts can be wrong or stale.** Agents wrote them, and nobody reviews them. Treat `staleFiles` as "verify
+  before relying on it", and replace an artifact when you find it's wrong.
 - **Not everything is code.** For strings, comments, config files, docs, or anything the indexer doesn't
   cover, use grep or Glob.

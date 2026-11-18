@@ -12,15 +12,24 @@ export const NOT_LOADED = "The graph is not loaded. Run `pnpm graph sync -p <pro
 export const openWriter = () => Database.open(DB_PATH);
 
 /** Newest mtime of any file in the store; every commit and checkpoint bumps it, read-only opens don't. */
-const storeVersion = () => Math.max(...readdirSync(DB_PATH, { recursive: true, encoding: "utf8" }).map((f) => statSync(join(DB_PATH, f)).mtimeMs));
+const storeVersion = (path: string) =>
+  Math.max(...readdirSync(path, { recursive: true, encoding: "utf8" }).map((f) => statSync(join(path, f)).mtimeMs));
 
-let cached: { version: number; conn: Connection } | undefined;
+const snapshots = new Map<string, { version: number; conn: Connection }>();
 
-/** A read-only connection. Read-only handles are snapshots, so this reopens once the store has changed. */
+/** A read-only connection to the store at `path`, which must exist. Read-only handles are snapshots, so this reopens once the store has changed. */
+export function snapshot(path: string): Connection {
+  const version = storeVersion(path);
+  const cached = snapshots.get(path);
+  if (cached?.version === version) return cached.conn;
+  // shortcut: @relate/relate 1.1.0 has no Database.close(), so each reopen leaks the old snapshot; fine for a few syncs per MCP session, close it once the client exposes that.
+  const conn = Database.open(path, { readOnly: true }).connect();
+  snapshots.set(path, { version, conn });
+  return conn;
+}
+
+/** A read-only connection to the code graph. */
 export function reader(): Connection {
   if (!existsSync(DB_PATH)) throw new Error(NOT_LOADED); // Relate only says "internal error" for a missing store
-  const version = storeVersion();
-  // shortcut: @relate/relate 1.1.0 has no Database.close(), so each reopen leaks the old snapshot; fine for a few syncs per MCP session, close it once the client exposes that.
-  if (cached?.version !== version) cached = { version, conn: Database.open(DB_PATH, { readOnly: true }).connect() };
-  return cached.conn;
+  return snapshot(DB_PATH);
 }

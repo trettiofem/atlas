@@ -105,6 +105,8 @@ const STEP_LABELS: Record<string, (a: Record<string, unknown>) => string> = {
   file_dependents: (a) => `Found what imports ${a.file}`,
   tests_for: (a) => `Found tests for ${a.name}`,
   impact: (a) => `Checked the impact of changing ${a.name}`,
+  find_artifacts: (a) => (a.query || a.symbol || a.file ? `Looked for artifacts on ${a.query || a.symbol || a.file}` : "Looked for artifacts"),
+  save_artifact: (a) => `Saved the artifact “${a.topic}”`,
 };
 const stepLabel = (name: string, input: Record<string, unknown>) => STEP_LABELS[name]?.(input) ?? `Queried code graph (${name})`;
 
@@ -269,7 +271,7 @@ export async function nameAgent(prompt: string): Promise<{ title: string; descri
       type: "object",
       properties: {
         title: { type: "string", description: "Sentence case, at most 6 words, no trailing period, e.g. “Investigation into billing logic”" },
-        description: { type: "string", description: "One short sentence, at most 12 words, on what the agent will find out, e.g. “Finds unused functions and types outside tests”" },
+        description: { type: "string", description: "One sentence on what the agent will find out" },
       },
       required: ["title", "description"],
     },
