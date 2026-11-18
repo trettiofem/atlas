@@ -1,4 +1,4 @@
-import { ArrowLeft, File, LoaderCircle, Search as SearchIcon } from "lucide-react";
+import { ArrowLeft, File, LoaderCircle, Search as SearchIcon, Waypoints } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   type ApiError,
@@ -22,7 +22,7 @@ import { ExplainDialog, ExplainTip } from "@/explain";
 import { cn } from "@/lib/utils";
 import { rememberSymbol } from "@/recent";
 import { type FileRef, type LineRange, SourcePanel, SourceText } from "@/source";
-import { KIND_FILTERS, kindLabel, PathLabel, SymbolIcon, type SymbolRef, searchHref } from "@/symbol";
+import { graphHref, KIND_FILTERS, kindLabel, PathLabel, SymbolIcon, type SymbolRef, searchHref } from "@/symbol";
 
 const DEBOUNCE_MS = 150;
 /** The API's default row limit for `search`. */
@@ -74,23 +74,7 @@ const sameSymbol = (a: SymbolRef | undefined, b: SymbolRef | undefined) =>
 export function Search({ params }: { params: URLSearchParams }) {
   const state = readState(params);
   const overview = useApi<Overview>("/api/overview");
-  if (overview.error) {
-    const { notLoaded, message } = overview.error;
-    return (
-      <div className="m-auto max-w-md px-4 text-center">
-        <p className="font-medium">{notLoaded ? "The graph isn’t loaded." : "Couldn’t reach the graph."}</p>
-        <p className="mt-1 text-muted-foreground">
-          {notLoaded ? (
-            <>
-              Run <code className="font-mono">pnpm graph sync -p &lt;project dir&gt;</code>, then reload.
-            </>
-          ) : (
-            message
-          )}
-        </p>
-      </div>
-    );
-  }
+  if (overview.error) return <GraphUnavailable error={overview.error} />;
   const { symbol } = state;
   return (
     <div className="relative flex min-h-0 flex-1">
@@ -108,6 +92,24 @@ export function Search({ params }: { params: URLSearchParams }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** In place of a page that needs the graph, when /api/overview fails. */
+export function GraphUnavailable({ error }: { error: ApiError }) {
+  return (
+    <div className="m-auto max-w-md px-4 text-center">
+      <p className="font-medium">{error.notLoaded ? "The graph isn’t loaded." : "Couldn’t reach the graph."}</p>
+      <p className="mt-1 text-muted-foreground">
+        {error.notLoaded ? (
+          <>
+            Run <code className="font-mono">pnpm graph sync -p &lt;project dir&gt;</code>, then reload.
+          </>
+        ) : (
+          error.message
+        )}
+      </p>
     </div>
   );
 }
@@ -243,6 +245,11 @@ function SymbolView({ state, symbol }: { state: SearchState; symbol: SymbolRef }
           {/* Phones keep the room for the name; the icon still says the kind. */}
           {found && <span className="hidden shrink-0 text-muted-foreground sm:inline">{kindLabel(found.kind)}</span>}
           <PathLabel path={symbol.file} line={symbol.line} className="ml-auto max-w-[50%] pl-4" />
+          <Button variant="ghost" size="icon-sm" className="-mr-2 text-muted-foreground" aria-label="Show in Code Graph" title="Show in Code Graph" asChild>
+            <a href={graphHref(symbol)}>
+              <Waypoints />
+            </a>
+          </Button>
         </header>
         {definition.error ? (
           <p className="m-auto px-4 text-muted-foreground">{definition.error.message}</p>

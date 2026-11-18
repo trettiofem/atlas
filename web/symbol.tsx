@@ -1,4 +1,4 @@
-import { Box, Code, Hash, type LucideIcon, Package, SquareFunction, Variable } from "lucide-react";
+import { Box, Code, File, Hash, type LucideIcon, Package, SquareFunction, Variable } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** One symbol: names aren't unique, but name, file and line are. */
@@ -8,7 +8,10 @@ export interface SymbolRef {
   line: number;
 }
 
-const ICON: Record<string, LucideIcon> = { Type: Box, Method: SquareFunction, Term: Variable, Namespace: Package, Macro: Hash };
+// "File" is the Code Graph's file nodes.
+const ICON: Record<string, LucideIcon> = { Type: Box, Method: SquareFunction, Term: Variable, Namespace: Package, Macro: Hash, File };
+
+export const kindIcon = (kind: string | null | undefined): LucideIcon => (kind && ICON[kind]) || Code;
 
 /** Graph kind labels in words: `Method` covers functions too, `Term` variables, fields and properties. */
 const KIND_LABEL: Record<string, string> = {
@@ -19,6 +22,7 @@ const KIND_LABEL: Record<string, string> = {
   Macro: "Macro",
   Parameter: "Parameter",
   TypeParameter: "Type parameter",
+  File: "File",
 };
 
 export const kindLabel = (kind: string | null | undefined) => (kind && KIND_LABEL[kind]) || "Symbol";
@@ -34,7 +38,7 @@ export const KIND_FILTERS: Record<string, string> = {
 
 /** Lucide icon for the symbol's kind, with the kind as screen-reader text. */
 export function SymbolIcon({ kind }: { kind: string | null | undefined }) {
-  const Icon = (kind && ICON[kind]) || Code;
+  const Icon = kindIcon(kind);
   // `relative` anchors the absolutely positioned sr-only text here; otherwise it escapes scrolling lists and stretches the page.
   return (
     <span className="relative shrink-0">
@@ -65,3 +69,6 @@ export function searchHref(params: Record<string, string | number | undefined>) 
   const query = p.toString();
   return query ? `#/search?${query}` : "#/search";
 }
+
+/** Link to the Code Graph page, opened on this symbol. */
+export const graphHref = ({ name, file, line }: SymbolRef) => `#/graph?${new URLSearchParams({ name, file, line: String(line) })}`;

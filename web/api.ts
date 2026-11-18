@@ -68,12 +68,58 @@ export function queryUrl(cmd: string, arg: string, opts: { file?: string; line?:
 
 export const fileUrl = (path: string) => `/api/file?${new URLSearchParams({ path })}`;
 
-async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
-  const res = await fetch(url, { signal });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, body.error ?? res.statusText);
-  return body as T;
+// Code Graph shapes (see src/graph.ts). Ids are `file:<path>` or `sym:<SCIP symbol>`.
+export type EdgeType = "USES" | "CONTAINS" | "DEFINES" | "REFERENCES" | "IMPORTS" | "IMPLEMENTS" | "TYPE_OF";
+export type Direction = "in" | "out";
+export interface GraphNode {
+  id: string;
+  /** "File", or the symbol's kind label. */
+  kind: string | null;
+  /** The symbol's name, or the file's path. */
+  name: string;
+  file: string | null;
+  line: number | null;
+  endLine: number | null;
+  external: boolean;
+  isTest: boolean;
+  package: string | null;
+  /** Edges to other nodes the graph shows. */
+  degree: number;
 }
+export interface GraphEdge {
+  source: string;
+  target: string;
+  type: EdgeType;
+  count: number;
+}
+export interface EdgeGroup {
+  type: EdgeType;
+  dir: Direction;
+  count: number;
+}
+export interface Subgraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export const graphUrl = (route: string, params: Record<string, string | number | undefined> = {}) => {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined) p.set(k, String(v));
+  const query = p.toString();
+  return `/api/graph/${route}${query ? `?${query}` : ""}`;
+};
+
+/** GETs, or POSTs `body` as JSON, and throws an ApiError for an error status. */
+export async function fetchJson<T>(url: string, { body, signal }: { body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+  const init: RequestInit =
+    body === undefined ? { signal } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal };
+  const res = await fetch(url, init);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, json.error ?? res.statusText);
+  return json as T;
+}
+
+const getJson = <T>(url: string, signal: AbortSignal) => fetchJson<T>(url, { signal });
 
 /**
  * GETs `url` (nothing when null) and refetches when it changes, aborting the stale request.
