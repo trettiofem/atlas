@@ -45,7 +45,7 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
 
 - **Headings**: Geist Bold with tight tracking (`font-bold tracking-tight`). The Home title is `text-2xl`.
 - **Body**: Geist 14px (`text-sm`, the body default). UI labels use `font-medium`.
-- **Mono**: Geist Mono (`font-mono`) for symbol names, file paths, code, line numbers and the footer tagline (`text-xs`).
+- **Mono**: Geist Mono (`font-mono`) for symbol names, file paths, code, and line numbers.
 - The fonts come from `@fontsource-variable/geist` and `geist-mono` and load locally, without Google Fonts.
 
 ### Shape and surfaces
@@ -92,7 +92,7 @@ A centered column 512px wide (`max-w-lg`), vertically centered, containing, from
 - The project row, so users know which code base they're asking about: `FolderCode`, the root's folder name in mono `font-medium` (the full path in its tooltip), and on the right muted "92 files · 16 tests · 736 symbols" from `/api/overview`. `overviewCounts` in `api.ts` does the counting, so these numbers match Search's hint. The row has a fixed height so the prompt doesn't move when the overview loads. With no graph it reads "No project loaded."
 - The prompt box: an auto-growing textarea with the placeholder "Ask me anything about the code base…", a `+` (add context) button bottom-left and an `ArrowRight` send button bottom-right. Enter sends and Shift+Enter adds a new line.
 - A row of outline suggestion chips ("Explain a module", "Find dead code", "Find callers"). Each fills the prompt with a fuller request that says what to cover and how to list results. A `[bracketed]` blank such as `[function name]` is selected when the chip fills the prompt, so typing replaces it. Prompts without a blank put the cursor at the end.
-- The tagline "Atlas -- Intelligent Code Analysis Platform" in mono `text-xs`.
+On load the column's parts enter one after another, top to bottom, 80ms apart: the logo, the title, the project row, the prompt box and the chips. Each one fades in, rises 0.5rem and comes into focus from a 4px blur, using `animate-intro` (500ms) from `style.css`. The tunnel fades in over 1s. It's all `motion-safe:`, so reduced motion shows the page at once. The prompt box animates inside its measured wrapper, because the tunnel reads that wrapper's position and a transform on it would throw off the vanishing point.
 
 Behind the column is a 3D wireframe tunnel (`Tunnel`): 1px neutral-67 lines on the flat background, in one-point perspective, with the vanishing point at the prompt box's center. It's an SVG generated from the page size, re-measured on resize. Its empty end wall (640×480 by default) frames the column, so no lines cross the text. Props set the end size, the line counts (`columns`, `rows`) and the camera `depth`. Floor cells are square in 3D, so the cross-lines bunch up toward the end.
 

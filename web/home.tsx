@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { type Overview, overviewCounts, useApi } from "@/api";
 import logo from "@/assets/LogoLarge.svg";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { PromptBox } from "@/prompt-box";
 import { Tunnel } from "@/tunnel";
 
@@ -25,6 +26,10 @@ const SUGGESTIONS = [
   },
 ];
 
+// The entrance runs top to bottom, one step apart, so the logo lands first.
+const INTRO = "motion-safe:animate-intro";
+const introDelay = (step: number) => ({ animationDelay: `${step * 80}ms` });
+
 export function Home() {
   const [prompt, setPrompt] = useState("");
   const promptBox = useRef<HTMLDivElement>(null);
@@ -42,34 +47,39 @@ export function Home() {
   };
   return (
     <div className="relative flex flex-1">
-      <Tunnel anchor={promptBox} />
+      <Tunnel anchor={promptBox} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-1000" />
       <div className="relative m-auto flex w-full max-w-lg flex-col items-center px-4 py-16">
         <h1 className="mb-10 flex items-center gap-3 text-2xl font-bold tracking-tight">
-          <img src={logo} alt="" width={39} height={27} />
-          What’s up?
+          <img src={logo} alt="" width={39} height={27} className={INTRO} style={introDelay(0)} />
+          <span className={INTRO} style={introDelay(1)}>
+            What’s up?
+          </span>
         </h1>
-        <Project />
-        <div ref={promptBox} className="w-full">
-          <PromptBox
-            value={prompt}
-            onValueChange={setPrompt}
-            // shortcut: the prompt is dropped; create an agent with it here once agents exist.
-            onSubmit={() => {
-              location.hash = "/agents";
-            }}
-            className="min-h-20"
-            autoFocus
-          />
+        <div className={cn("w-full", INTRO)} style={introDelay(2)}>
+          <Project />
         </div>
-        <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+        <div ref={promptBox} className="w-full">
+          {/* Animated inside the measured box: the tunnel reads its position, transform included. */}
+          <div className={INTRO} style={introDelay(3)}>
+            <PromptBox
+              value={prompt}
+              onValueChange={setPrompt}
+              // shortcut: the prompt is dropped; create an agent with it here once agents exist.
+              onSubmit={() => {
+                location.hash = "/agents";
+              }}
+              className="min-h-20"
+              autoFocus
+            />
+          </div>
+        </div>
+        <div className={cn("mt-2.5 flex flex-wrap justify-center gap-2", INTRO)} style={introDelay(4)}>
           {SUGGESTIONS.map((s) => (
             <Button key={s.label} variant="outline" size="sm" onClick={() => fill(s.prompt)}>
               {s.label}
             </Button>
           ))}
-        </div>
-        <p className="mt-16 font-mono text-xs">Atlas -- Intelligent Code Analysis Platform</p>
-      </div>
+        </div>      </div>
     </div>
   );
 }
