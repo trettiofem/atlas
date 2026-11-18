@@ -23,6 +23,7 @@
   "packageManager": "pnpm@12.14.0",
   "type": "module",
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -37,6 +38,7 @@
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
     "shiki": "^4.6.0",
     "tailwind-merge": "^3.7.0",
     "zod": "4.6.5"

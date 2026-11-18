@@ -1,7 +1,8 @@
 import "./style.css";
 import { type CSSProperties, StrictMode, useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
-import { Agents, findAgent } from "@/agents";
+import { Agents, findAgent, NEW } from "@/agents";
+import { useAgents } from "@/agents-store";
 import { AppSidebar, NAV } from "@/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Graph } from "@/graph";
@@ -21,9 +22,10 @@ function App() {
   const path = `/${section}`;
   const page = NAV.find((n) => n.path === path);
   const params = new URLSearchParams(query);
+  const { agents } = useAgents();
   // "_minColorDistance · Symbols · Atlas", "Investigation into billing logic · Agents · Atlas", or just "Atlas" on Home.
   const subject =
-    path === "/search" || path === "/graph" ? params.get("name") : path === "/agents" ? findAgent(id)?.title : undefined;
+    path === "/search" || path === "/graph" ? params.get("name") : path === "/agents" ? (id === NEW ? "New agent" : findAgent(agents, id)?.title) : undefined;
   const title = [subject, path === "/" ? undefined : (page?.title ?? "Not found"), "Atlas"].filter(Boolean).join(" · ");
   useEffect(() => {
     document.title = title;

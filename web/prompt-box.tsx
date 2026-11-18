@@ -2,27 +2,32 @@ import { ArrowRight, Plus } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
-/** The "Ask me anything" box on Home and under an agent's conversation. `className` sizes the textarea. */
+/**
+ * The "Ask me anything" box on Home and under an agent's conversation. `className` sizes the textarea. `disabled`
+ * only blocks sending (while an answer is on its way), so the next prompt can be drafted.
+ */
 export function PromptBox({
   value,
   onValueChange,
   onSubmit,
+  disabled,
   className,
   autoFocus,
 }: {
   value: string;
   onValueChange: (value: string) => void;
   onSubmit: (prompt: string) => void;
+  disabled?: boolean;
   className?: string;
   autoFocus?: boolean;
 }) {
-  const empty = !value.trim();
+  const blocked = disabled || !value.trim();
   return (
     <form
       className="w-full"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!empty) onSubmit(value.trim());
+        if (!blocked) onSubmit(value.trim());
       }}
     >
       <InputGroup className="rounded-xl">
@@ -46,7 +51,7 @@ export function PromptBox({
           <InputGroupButton variant="outline" size="icon-sm" className="shadow-raised" aria-label="Add context">
             <Plus />
           </InputGroupButton>
-          <InputGroupButton type="submit" variant="primary" size="icon-sm" className="shadow-raised-primary" aria-label="Send" disabled={empty}>
+          <InputGroupButton type="submit" variant="primary" size="icon-sm" className="shadow-raised-primary" aria-label="Send" disabled={blocked}>
             <ArrowRight />
           </InputGroupButton>
         </InputGroupAddon>

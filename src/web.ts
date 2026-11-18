@@ -1,11 +1,16 @@
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { createServer as createVite } from "vite";
-import { handleApi } from "./api.js";
 
 const PORT = 5182;
 const WEB_ROOT = fileURLToPath(new URL("../web", import.meta.url));
+const ENV_FILE = fileURLToPath(new URL("../.env", import.meta.url));
+
+// CLAUDE_API_KEY (and CLAUDE_MODEL) for the agents; loaded before the API module reads them.
+if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
+const { handleApi } = await import("./api.js");
 
 // One process: /api/* goes to the graph, everything else to Vite, which serves the React app in web/.
 const server = createServer();

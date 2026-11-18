@@ -1,5 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { hasApiKey, NO_API_KEY } from "./agent.js";
+import { createAgent, explain, listAgents, parseExplain, sendMessage, subscribe } from "./agents.js";
 import { NOT_LOADED, reader } from "./db.js";
 import { findPath, findSymbolId, getEdgesAmong, getNeighbors, getNode, isEdgeType, isNodeId, searchNodes } from "./graph.js";
 import { getProject, isIndexedFile, isQueryCommand, overview, runQuery } from "./queries.js";
@@ -11,6 +13,14 @@ const MAX_BODY_BYTES = 1_000_000;
 const MAX_EDGE_IDS = 5000;
 
 const LINE = /^[1-9]\d*$/;
+const AGENT_MESSAGES = /^\/api\/agents\/([\w-]+)\/messages$/;
+const MAX_PROMPT = 20_000;
+const STREAM_MS = 100;
+
+const promptOf = (body: unknown) => {
+  const prompt = (body as { prompt?: unknown } | undefined)?.prompt;
+  return typeof prompt === "string" && prompt.trim() && prompt.length <= MAX_PROMPT ? prompt.trim() : undefined;
+};
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
   let size = 0;
@@ -42,6 +52,11 @@ const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
  *   GET  /api/graph/neighbors?id=<id>[&type=<EDGE>&dir=in|out&limit=<n>]
  *   POST /api/graph/edges {ids: [...]}                    every edge between these nodes
  *   GET  /api/graph/path?from=<id>&to=<id>[&types=USES,CONTAINS&directed=1]   a shortest path; no nodes if none
+ * and for agents (see src/agents.ts):
+ *   GET  /api/agents/events                 SSE: a `snapshot` of every agent, then an `agent` event per change
+ *   POST /api/agents {prompt}               creates an agent and starts it; returns the agent
+ *   POST /api/agents/<id>/messages {prompt} a follow-up; 409 while the agent is working
+ *   POST /api/explain {file, lines, name, messages}   NDJSON: the reply's turns so far, one snapshot per line
  */
 export async function handleApi(req: IncomingMessage, res: ServerResponse) {
   const send = (status: number, body: unknown) =>
@@ -118,10 +133,71 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse) {
         const path = await findPath(reader(), p.from, p.to, { types, directed: p.directed === "1" });
         return send(200, path ?? { nodes: [], edges: [] });
       }
+      case "/api/agents/events": {
+        const agents = listAgents();
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        const event = (name: string, data: unknown) => res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+        event("snapshot", agents);
+        const unsubscribe = subscribe((agent) => event("agent", agent));
+        res.on("close", unsubscribe);
+        return;
+      }
+      case "/api/agents": {
+        if (req.method !== "POST") return send(405, { error: "Use POST" });
+        if (!hasApiKey()) return send(503, { error: NO_API_KEY });
+        const prompt = promptOf(await readJson(req));
+        if (!prompt) return send(400, { error: "Expected {prompt}" });
+        return send(201, createAgent(prompt));
+      }
+      case "/api/explain": {
+        if (req.method !== "POST") return send(405, { error: "Use POST" });
+        if (!hasApiKey()) return send(503, { error: NO_API_KEY });
+        const body = parseExplain(await readJson(req));
+        if (typeof body === "string") return send(400, { error: body });
+        return streamExplain(req, res, body);
+      }
+    }
+    const messages = url.pathname.match(AGENT_MESSAGES);
+    if (messages) {
+      if (req.method !== "POST") return send(405, { error: "Use POST" });
+      if (!hasApiKey()) return send(503, { error: NO_API_KEY });
+      const prompt = promptOf(await readJson(req));
+      if (!prompt) return send(400, { error: "Expected {prompt}" });
+      const sent = sendMessage(messages[1], prompt);
+      if (sent === undefined) return send(404, { error: "No such agent" });
+      return sent ? send(202, {}) : send(409, { error: "The agent is still working" });
     }
     send(404, { error: "Not found" });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     send(message === NOT_LOADED ? 503 : e instanceof RangeError ? 413 : 500, { error: message });
   }
+}
+
+/** Streams an Explain reply as NDJSON: each line is the reply's turns so far, at most one line per 100ms. */
+async function streamExplain(req: IncomingMessage, res: ServerResponse, body: Exclude<ReturnType<typeof parseExplain>, string>) {
+  const abort = new AbortController();
+  res.on("close", () => abort.abort());
+  res.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-cache" });
+  let latest: unknown[] = [];
+  let timer: NodeJS.Timeout | undefined;
+  const flush = () => {
+    clearTimeout(timer);
+    timer = undefined;
+    res.write(`${JSON.stringify(latest)}\n`);
+  };
+  try {
+    await explain(
+      body,
+      (turns) => {
+        latest = turns;
+        timer ??= setTimeout(flush, STREAM_MS);
+      },
+      abort.signal,
+    );
+  } catch (e) {
+    latest = [...latest, { type: "error", text: e instanceof Error ? e.message : String(e) }];
+  }
+  if (!abort.signal.aborted) flush();
+  res.end();
 }

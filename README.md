@@ -108,7 +108,8 @@ would corrupt the stdio stream.
 `pnpm web` starts **Atlas**, a React UI at http://localhost:5182 (React, Tailwind, shadcn/ui).
 - **Search** runs on the loaded graph. Find a symbol, then read its source and browse its callers, callees,
   references, tests and impact.
-- **Home** (the prompt box) and **Agents** are built, with mock data from `web/mock.tsx`.
+- **Home** starts an agent from a prompt, and **Agents** lists them and continues their conversations. Agents
+  answer with Claude (see [Agents](#agents)). The Explain chat on highlighted code uses the same loop.
 - **Code Graph** draws the loaded graph with [Cytoscape.js](https://js.cytoscape.org). Start from a symbol or file,
   expand and collapse nodes to follow their edges, and find the shortest path between two nodes.
 
@@ -129,6 +130,10 @@ and refuses API requests whose `Host` isn't loopback. Run `pnpm graph sync` firs
 | `GET /api/graph/neighbors?id=<id>` | a node's neighbors and the edges to them; optional `type`, `dir` (`in`/`out`), `limit` per group |
 | `POST /api/graph/edges` | `{ ids }` in, every edge between those nodes out |
 | `GET /api/graph/path?from=<id>&to=<id>` | a shortest path (`nodes`, `edges`; empty if none); optional `types` (comma-separated) and `directed=1` |
+| `GET /api/agents/events` | server-sent events: a `snapshot` of every agent, then an `agent` event per change (at most every 100ms) |
+| `POST /api/agents` | `{ prompt }` in; creates an agent, starts it, and returns it |
+| `POST /api/agents/<id>/messages` | `{ prompt }` in; a follow-up (409 while the agent is still working) |
+| `POST /api/explain` | `{ file, lines, name, messages }` in; NDJSON out, each line the reply's turns so far |
 
 Graph node ids are `file:<path>` or `sym:<SCIP symbol>`, stable across syncs. Paths come from a bidirectional
 breadth-first search in [src/graph.ts](src/graph.ts), one Cypher query per hop, rather than Cypher's
@@ -136,6 +141,24 @@ breadth-first search in [src/graph.ts](src/graph.ts), one Cypher query per hop, 
 parameters and never pass through external symbols.
 
 `line` narrows name-based queries to the symbol defined on that line, for same-name symbols in one file.
+
+### Agents
+
+Agents need `CLAUDE_API_KEY` in `.env`, which `pnpm web` loads. They use the newest Haiku (`claude-haiku-5-5`);
+set `CLAUDE_MODEL` to use another model. Without a key, the agent routes return 503.
+
+[src/agent.ts](src/agent.ts) runs Claude with the Messages API in a tool loop. It starts [src/mcp.ts](src/mcp.ts)
+with the MCP client SDK (the same command as `.mcp.json`), so agents get exactly the code-graph tools Claude Code
+does, plus a local `show_code` tool that puts a file's lines into the transcript. Each tool call is a step in the
+transcript, and answers stream in as markdown.
+
+> **Warning: agent storage is a temporary solution.** Agents are saved in a second embedded RelateDB store,
+> `agents-db/` (git-ignored), separate from the code graph in `graph-db/`. Each agent is an `Agent` node with its
+> `Turn` nodes, and its Anthropic message history is a JSON string property. Every save rewrites all of an agent's
+> turns. The web server is the store's only writer, so only one `pnpm web` can run at a time. Replace it with a
+> proper store before agents have several users. See [src/agents-db.ts](src/agents-db.ts).
+
+If the server stops while an agent works, the agent is marked interrupted on the next start and can take a follow-up.
 
 ## Queries
 

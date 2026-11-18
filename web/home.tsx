@@ -1,5 +1,6 @@
 import { FolderCode } from "lucide-react";
 import { useRef, useState } from "react";
+import { createAgent } from "@/agents-store";
 import { type Overview, overviewCounts, useApi } from "@/api";
 import logo from "@/assets/LogoLarge.svg";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,20 @@ const introDelay = (step: number) => ({ animationDelay: `${step * 80}ms` });
 
 export function Home() {
   const [prompt, setPrompt] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string>();
   const promptBox = useRef<HTMLDivElement>(null);
+  const send = async (text: string) => {
+    setSending(true);
+    setError(undefined);
+    try {
+      const agent = await createAgent(text);
+      location.hash = `/agents/${agent.id}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setSending(false);
+    }
+  };
   const fill = (text: string) => {
     setPrompt(text);
     // After React has written the value into the textarea.
@@ -64,10 +78,8 @@ export function Home() {
             <PromptBox
               value={prompt}
               onValueChange={setPrompt}
-              // shortcut: the prompt is dropped; create an agent with it here once agents exist.
-              onSubmit={() => {
-                location.hash = "/agents";
-              }}
+              onSubmit={send}
+              disabled={sending}
               className="min-h-20"
               autoFocus
             />
@@ -79,7 +91,9 @@ export function Home() {
               {s.label}
             </Button>
           ))}
-        </div>      </div>
+        </div>
+        {error && <p className="mt-4 text-center text-muted-foreground">{error}</p>}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { BookSearch, Bot, House, type LucideIcon, Waypoints } from "lucide-react";
 import { AgentIcon } from "@/agent-icon";
+import { useAgents } from "@/agents-store";
 import logo from "@/assets/Logo.svg";
 import wordmark from "@/assets/LogoWordmark.svg";
 import avatar from "@/assets/UserLarge.svg";
@@ -15,9 +16,11 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { AGENTS, USER } from "@/mock";
+import { USER } from "@/mock";
 import { useRecentSymbols } from "@/recent";
 import { SymbolIcon, searchHref } from "@/symbol";
+
+const LATEST_AGENTS = 5;
 
 export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
   { path: "/", title: "Home", icon: House },
@@ -29,6 +32,7 @@ export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
 // Collapsed ("icon") mode: the mark replaces the wordmark, the trigger moves to the footer and Latest hides.
 export function AppSidebar({ route }: { route: string }) {
   const symbols = useRecentSymbols();
+  const { agents } = useAgents();
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex-row items-center justify-between px-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
@@ -66,8 +70,7 @@ export function AppSidebar({ route }: { route: string }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-            {/* shortcut: mock agents; replace once agents are tracked. */}
-            {AGENTS.map((a) => (
+            {agents.slice(0, LATEST_AGENTS).map((a) => (
               <SidebarMenuItem key={a.id}>
                 <SidebarMenuButton asChild>
                   <a href={`#/agents/${a.id}`}>

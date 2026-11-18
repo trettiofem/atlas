@@ -68,6 +68,25 @@ export function queryUrl(cmd: string, arg: string, opts: { file?: string; line?:
 
 export const fileUrl = (path: string) => `/api/file?${new URLSearchParams({ path })}`;
 
+// Agent shapes (see src/agent.ts and src/agents.ts).
+export type Turn =
+  | { type: "user"; text: string }
+  /** A tool call or thinking step; no `durationMs` means it is still running. */
+  | { type: "step"; kind: "graph" | "thought"; label: string; durationMs?: number }
+  /** Markdown. */
+  | { type: "answer"; text: string }
+  | { type: "file"; path: string; lines?: [number, number] }
+  | { type: "error"; text: string };
+export interface Agent {
+  id: string;
+  title: string;
+  description: string;
+  status: "ready" | "working";
+  createdAt: number;
+  updatedAt: number;
+  turns: Turn[];
+}
+
 // Code Graph shapes (see src/graph.ts). Ids are `file:<path>` or `sym:<SCIP symbol>`.
 export type EdgeType = "USES" | "CONTAINS" | "DEFINES" | "REFERENCES" | "IMPORTS" | "IMPLEMENTS" | "TYPE_OF";
 export type Direction = "in" | "out";

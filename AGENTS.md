@@ -19,12 +19,15 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
   - [web/source.tsx](web/source.tsx): `CodeLines`, `SourceText` (a whole file, scrolled to its highlight) and `SourcePanel`, shared by Agents and Search. Every code view goes through `CodeLines`, which takes the whole file's text and path. Snippets pass `only` with their lines, so they're colored in the context of the whole file.
  - [web/highlight.ts](web/highlight.ts): syntax highlighting with Shiki (`useTokens`). It picks the language from the path's extension, loads that grammar on demand and caches the last 20 files. Code shows plain until the tokens arrive, and stays plain for unknown languages.
   - [web/symbol.tsx](web/symbol.tsx): `SymbolIcon`, kind labels, `PathLabel`, `searchHref` and `graphHref`.
-  - [web/chat.tsx](web/chat.tsx): `UserMessage` (the raised bubble) and `Step` (an icon, a label and a duration, or a spinner while running), shared by Agents and the Explain chat.
+  - [web/chat.tsx](web/chat.tsx): `UserMessage` (the raised bubble), `Step` (an icon, a label and a duration, or a spinner while running) and `TurnView`, which renders one transcript turn (message, step, markdown answer, file reference with its snippet, or error). Shared by Agents and the Explain chat.
+  - [web/agents-store.ts](web/agents-store.ts): every agent, kept live by one `EventSource` on `/api/agents/events` (`useAgents`), plus `createAgent` and `sendMessage`.
   - [web/explain.tsx](web/explain.tsx): the Explain tip and the Explain chat dialog (`components/ui/dialog.tsx`).
  - [web/tunnel.tsx](web/tunnel.tsx): `Tunnel`, the generated SVG wireframe tunnel behind Home.
  - [web/graph-canvas.tsx](web/graph-canvas.tsx): `GraphCanvas`, the Cytoscape view of the Code Graph, and [web/graph-model.ts](web/graph-model.ts), the pure model of what it shows (tested in `graph-model.test.ts`).
-- **Backend**: Search, Code Graph and Home's project row are live. [web/api.ts](web/api.ts) has the row and graph types, `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests, and `fetchJson` for one-off requests and POSTs. A 503 means no graph is loaded.
-- **Mock data**: agents, transcripts and their source are in [web/mock.tsx](web/mock.tsx), and so are the agents in the sidebar's "Latest" list. Sending a prompt does nothing yet, and the Explain chat never answers.
+- **Backend**: everything is live. [web/api.ts](web/api.ts) has the row, graph, agent and turn types, `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests, and `fetchJson` for one-off requests and POSTs. A 503 means no graph is loaded, or, for agent routes, that `CLAUDE_API_KEY` isn't set.
+- **Agents and the Explain chat** run on the server with the Anthropic Messages API, Haiku by default (`CLAUDE_MODEL` overrides it), using the key in `.env` (`CLAUDE_API_KEY`). [src/agent.ts](src/agent.ts) is the run loop. It starts [src/mcp.ts](src/mcp.ts) as an MCP client over stdio, so Claude gets the same code-graph tools as Claude Code, plus a local `show_code` tool that adds a file reference with its lines to the transcript. [src/agents.ts](src/agents.ts) keeps agents in memory, streams changes, and recovers agents a stopped server left working.
+- **Agents storage is temporary**: [src/agents-db.ts](src/agents-db.ts) saves agents in a second embedded RelateDB store (`agents-db/`, git-ignored), separate from the code graph, with the Anthropic history as a JSON string. It's a stopgap to keep agents across restarts; replace it with a proper store before agents have several users.
+- **Mock data**: only the user (`USER` in [web/mock.tsx](web/mock.tsx)), shown in the sidebar footer and as every agent's creator.
 - **Recent symbols**: [web/recent.ts](web/recent.ts) keeps the last 5 symbols opened in Search in localStorage, for "Latest".
 
 ### Design tokens
@@ -82,7 +85,7 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 - **Expanded**:
   - Header: `LogoWordmark.svg` on the left and the collapse trigger on the right.
   - Nav: Home (`House`), Agents (`Bot`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
-  - "Latest": the symbols and agents the user last touched. Symbols (the last 5 opened in Search) come first, with their `SymbolIcon` and mono text, and link back to Search. Agents show `AgentIcon` and sans text. All entries truncate with an ellipsis.
+  - "Latest": the symbols and agents the user last touched. Symbols (the last 5 opened in Search) come first, with their `SymbolIcon` and mono text, and link back to Search. Agents (the 5 newest) show `AgentIcon` and sans text. All entries truncate with an ellipsis.
   - Footer: the user, with the 24px `UserLarge.svg` avatar, the name in `font-medium` and the muted org underneath. It's mock data (`USER` in `mock.tsx`) and does nothing yet.
 - **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Latest" hidden, and at the bottom the avatar above the trigger.
 - What the nav items do:
@@ -148,25 +151,29 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
   - When the highlight starts at the file's first line, it goes underneath instead.
 - **Dialog** (`components/ui/dialog.tsx`): raised like the prompt box (`border` plus `shadow-raised`) and `rounded-xl`, over a translucent white overlay (`bg-background/70`) that Sheet uses too. It's 672px wide (`sm:max-w-2xl`) and `min(40rem, 85svh)` tall.
   - Header (44px): `Sparkles`, then "Explain" and the mono symbol name in `font-medium`. The dialog's ghost close `X` sits in it.
-  - Transcript: the muted `path:from-to` with a `File` icon, and a bordered snippet of the lines (the blue highlight, at most 240px tall). Then the user's messages (`UserMessage`, starting with "Explain this code") and a running `Step`, "Thinking…".
-  - The prompt box is pinned to the bottom with a top border and gets focus. Follow-ups are added to the transcript.
+  - Transcript: the muted `path:from-to` with a `File` icon, and a bordered snippet of the lines (the blue highlight, at most 240px tall). Then the user's messages (`UserMessage`, starting with "Explain this code"), each followed by its reply, rendered with `TurnView` like an agent's. A running `Step`, "Thinking…", shows until the reply starts.
+  - The prompt box is pinned to the bottom with a top border and gets focus. Follow-ups are added to the transcript, and sending waits until the reply is done.
+  - Each reply is a POST to `/api/explain` with the whole chat (the client keeps it), streamed back as NDJSON snapshots of the reply's turns. Closing the dialog aborts it.
 
 ### Agents page
 
-`#/agents/<id>` opens that agent, and `#/agents` opens the first. The page has three columns, separated by 1px borders, each scrolling on its own:
+`#/agents/<id>` opens that agent, and `#/agents` opens the newest. `#/agents/new` is an empty conversation: a "New agent" header (`Bot`), a centered muted hint and the focused prompt box. Sending creates the agent and replaces the URL with its own, so Back skips the empty one. With no agents the page says "No agents yet. Start one." and links to `#/agents/new`. The page has three columns, separated by 1px borders, each scrolling on its own:
 1. **Agent list** (320px, hidden on mobile):
- - A top block (`border-b p-4`): a raised `InputGroup` like Search's (a `Search` icon and "Find an agent…") and, beside it, a square `primary` icon button (`Plus`, `aria-label` "Create") that goes to Home, where new agents start. The field filters the list as you type (Escape clears it) with `fuzzyFilter` from [web/fuzzy.ts](web/fuzzy.ts). Every query word has to match a word in the title, description or creator's name, by prefix, inside the word, with letters missing or with a typo, and title matches rank first. With no match it says "No agents match “x”."
+ - A top block (`border-b p-4`): a raised `InputGroup` like Search's (a `Search` icon and "Find an agent…") and, beside it, a square `primary` icon button (`Plus`, `aria-label` "Create") that opens a new conversation (`#/agents/new`). The field filters the list as you type (Escape clears it) with `fuzzyFilter` from [web/fuzzy.ts](web/fuzzy.ts). Every query word has to match a word in the title, description or creator's name, by prefix, inside the word, with letters missing or with a typo, and title matches rank first. With no match it says "No agents match “x”."
  - Each agent shows an `AgentIcon`, then its bold one-line title. The description sits underneath, indented to line up with the title, and is cut off after 6 lines.
  - Under the `AgentIcon`, level with the description's first line, the 12px `User.svg` avatar shows who created the agent (`creator`, with "Created by …" as its alt text and tooltip). For now it's always the mock `USER`.
    - A border separates agents. The open agent gets the `accent` fill.
 2. **Conversation**:
    - Header (44px, bottom border): `AgentIcon` and the title in `font-medium`.
    - User messages: right-aligned raised bubbles (`UserMessage` in `chat.tsx`).
-   - Agent steps: muted rows with an icon, the step and its duration, such as "Queried code graph · 52ms" (`Waypoints`) and "Thought · 2s" (`CircleCheck`). A running step has no duration and a spinning `LoaderCircle`.
-   - Answer: body text with inline `<code>` (Geist Mono, no background) and bullet lists.
-   - File references (`FileRef`: a path plus optional `lines`): a ghost button with a `File` icon, the mono path (`text-xs`, so it matches the body text visually) and a `ChevronRight`. Clicking one opens the source panel.
+   - Agent steps: muted rows with an icon, the step and its duration. Each code-graph tool call is one (`Waypoints`), such as "Found callers of buildGraph · 8ms". Waiting on Claude for more than a second shows "Thought · 2s" (`CircleCheck`). A running step has no duration and a spinning `LoaderCircle`.
+   - Consecutive steps fold into one muted row (`Transcript` in `chat.tsx`), so tool calls don't fill the screen: "Queried the code graph 15 times · 21s" (or "Thought · 4s" if there were no queries), with a `ChevronRight` that turns down when expanded and lists the steps, indented behind a left border. While a step runs, the row shows that step with the spinner. A lone step shows as it is. The Explain chat folds steps the same way.
+   - Answer: markdown (`react-markdown`) as body text, with inline `<code>` (Geist Mono, no background) and bullet lists. Answers stream in as they're written.
+   - Errors (API failures, an interrupted run): a muted row with `CircleAlert`.
+   - File references (`FileRef`: a path plus optional `lines`), added when the agent calls `show_code`: a ghost button with a `File` icon, the mono path (`text-xs`, so it matches the body text visually) and a `ChevronRight`. Clicking one opens the source panel.
    - When the agent highlights lines, the reference reads `path:19-22` and a bordered snippet of exactly those lines sits under it.
-   - The prompt box is pinned to the bottom, with a top border.
+   - The transcript follows new turns unless you've scrolled up.
+   - The prompt box is pinned to the bottom, with a top border. Sending is disabled while the agent works (the status dot is salmon), but you can draft.
 3. **Source panel** (`min(30rem, 40%)`, covers the conversation on mobile):
    - A 44px header with the `File` icon, the mono path and a close `X`.
    - Mono `text-xs` code with a muted, right-aligned line-number gutter. Long lines scroll sideways.

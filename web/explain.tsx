@@ -1,6 +1,7 @@
 import { CircleCheck, File, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Step, UserMessage } from "@/chat";
+import type { Turn } from "@/api";
+import { Step, Transcript, UserMessage } from "@/chat";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { PromptBox } from "@/prompt-box";
@@ -63,13 +64,72 @@ export function ExplainDialog({
   );
 }
 
+interface Exchange {
+  prompt: string;
+  reply: Turn[];
+  done: boolean;
+}
+
+/** The reply's answer text, as the assistant's side of the chat history sent back with follow-ups. */
+const answerText = (reply: Turn[]) =>
+  reply
+    .filter((t) => t.type === "answer")
+    .map((t) => t.text)
+    .join("\n\n");
+
+/** POSTs the chat to /api/explain and calls `onTurns` with each NDJSON snapshot of the reply. */
+async function streamReply(body: unknown, onTurns: (turns: Turn[]) => void, signal: AbortSignal) {
+  const res = await fetch("/api/explain", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal });
+  if (!res.ok || !res.body) {
+    const error = await res.json().catch(() => undefined);
+    throw new Error(error?.error ?? res.statusText);
+  }
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const lines = buffer.split("\n");
+    buffer = lines.pop()!;
+    if (lines.length > 0) onTurns(JSON.parse(lines[lines.length - 1]));
+  }
+}
+
 function ExplainChat({ name, file, text, startLine, lines }: { name: string; file: string; text: string; startLine: number; lines: LineRange }) {
-  const [prompts, setPrompts] = useState(["Explain this code"]);
+  const [exchanges, setExchanges] = useState<Exchange[]>([{ prompt: "Explain this code", reply: [], done: false }]);
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
-  }, [prompts]);
+  }, [exchanges]);
+
+  // Each new prompt asks for one reply, sending the chat so far. Closing the dialog unmounts this and aborts it.
+  const latest = useRef(exchanges);
+  latest.current = exchanges;
+  const count = exchanges.length;
+  useEffect(() => {
+    const abort = new AbortController();
+    const i = count - 1;
+    const update = (change: (x: Exchange) => Partial<Exchange>) => setExchanges((list) => list.map((x, j) => (j === i ? { ...x, ...change(x) } : x)));
+    const messages = latest.current
+      .slice(0, i)
+      .flatMap((x) => [
+        { role: "user", text: x.prompt },
+        { role: "assistant", text: answerText(x.reply) },
+      ])
+      .concat({ role: "user", text: latest.current[i].prompt });
+    update(() => ({ reply: [], done: false }));
+    streamReply({ file, lines, name, messages }, (reply) => update(() => ({ reply })), abort.signal).then(
+      () => update(() => ({ done: true })),
+      (e) => {
+        if (abort.signal.aborted) return;
+        update((x) => ({ done: true, reply: [...x.reply, { type: "error", text: e instanceof Error ? e.message : String(e) }] }));
+      },
+    );
+    return () => abort.abort();
+  }, [count, file, lines, name]);
+  const answering = !exchanges[count - 1].done;
   return (
     <>
       {/* pr-12 leaves room for the dialog's close button. */}
@@ -90,11 +150,13 @@ function ExplainChat({ name, file, text, startLine, lines }: { name: string; fil
           </p>
           <CodeLines text={text} path={file} startLine={startLine} only={lines} highlight={lines} className="max-h-60 rounded-md border py-1.5" />
         </div>
-        {prompts.map((prompt, i) => (
-          <UserMessage key={i}>{prompt}</UserMessage>
+        {exchanges.map((x, i) => (
+          <div key={i} className="space-y-4">
+            <UserMessage>{x.prompt}</UserMessage>
+            {x.reply.length === 0 && !x.done && <Step icon={CircleCheck} label="Thinking…" />}
+            <Transcript turns={x.reply} />
+          </div>
         ))}
-        {/* shortcut: nothing answers until a chat backend exists, so the chat keeps thinking. */}
-        <Step icon={CircleCheck} label="Thinking…" />
         <div ref={end} />
       </div>
       <div className="border-t p-4">
@@ -102,9 +164,10 @@ function ExplainChat({ name, file, text, startLine, lines }: { name: string; fil
           value={draft}
           onValueChange={setDraft}
           onSubmit={(prompt) => {
-            setPrompts((list) => [...list, prompt]);
+            setExchanges((list) => [...list, { prompt, reply: [], done: false }]);
             setDraft("");
           }}
+          disabled={answering}
           className="min-h-10"
           autoFocus
         />
