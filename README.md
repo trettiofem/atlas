@@ -105,13 +105,26 @@ would corrupt the stdio stream.
 
 ## Web UI
 
-`pnpm web` starts **Atlas**, a React UI at http://localhost:5180 (React, Tailwind, shadcn/ui). Home (the prompt
-box) and Agents are built, Agents with mock data from `web/mock.tsx`. Search and Code Graph are placeholders. The
-design language and tokens are in [AGENTS.md](AGENTS.md).
+`pnpm web` starts **Atlas**, a React UI at http://localhost:5182 (React, Tailwind, shadcn/ui).
+- **Search** runs on the loaded graph. Find a symbol, then read its source and browse its callers, callees,
+  references, tests and impact.
+- **Home** (the prompt box) and **Agents** are built, with mock data from `web/mock.tsx`.
+- **Code Graph** is a placeholder.
+
+The design language and tokens are in [AGENTS.md](AGENTS.md).
 
 It is one process. [src/web.ts](src/web.ts) serves a JSON API ([src/api.ts](src/api.ts), the same queries as the
 MCP server) and hands everything else to Vite, which serves the app in [web/](web/). It listens on 127.0.0.1 only
 and refuses API requests whose `Host` isn't loopback. Run `pnpm graph sync` first. Reload the page after a sync.
+
+| Route | Returns |
+|---|---|
+| `GET /api/overview` | loaded project, files per language, symbols per kind (503 if nothing is loaded) |
+| `GET /api/query?cmd=<query>&arg=<name or path>` | the rows of a [query](#queries); optional `file`, `line`, `kind`, `depth` |
+| `GET /api/source?name=<symbol>` | definition source, like the MCP `get_source` tool; optional `file` |
+| `GET /api/file?path=<file>` | `{ file, text }`; only files in the graph (404 otherwise), at most 1 MB |
+
+`line` narrows name-based queries to the symbol defined on that line, for same-name symbols in one file.
 
 ## Queries
 
@@ -124,6 +137,6 @@ Other commands: `index [file]`, `load [file]`, `sync`. Run `pnpm graph` with no 
 
 Sources: `src/main.ts` (CLI entry point), `src/mcp.ts` (MCP server), `src/web.ts` + `src/api.ts` (web UI server),
 `web/` (React UI), `src/queries.ts` (Cypher queries shared by
-both), `src/source.ts` (source slicing), `src/index.ts` (runs scip-typescript), `src/parse.ts`
+all three), `src/source.ts` (source slicing), `src/index.ts` (runs scip-typescript), `src/parse.ts`
 (SCIP -> graph), `src/load.ts` (graph -> RelateDB), `src/db.ts` (store access), `src/types.ts` (SCIP and graph
 types), `src/languages.ts` (per-language rules), `schemas/graph.cypher` (graph schema).

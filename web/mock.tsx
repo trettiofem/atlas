@@ -1,15 +1,7 @@
 // shortcut: hand-written agents and source for the UI; replace with the agents API once it exists.
 import type { ReactNode } from "react";
 import type { AgentStatus } from "@/agent-icon";
-
-/** Inclusive, 1-based line numbers in a file. */
-export type LineRange = [from: number, to: number];
-
-/** A file the agent points at, optionally at lines it highlights. */
-export interface FileRef {
-  path: string;
-  lines?: LineRange;
-}
+import type { FileRef } from "@/source";
 
 export type Turn =
   | { type: "user"; text: string }

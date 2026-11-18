@@ -20,13 +20,16 @@ export interface QueryOptions {
   depth?: string | number;
   /** Restricts name-based queries to symbols defined in this project-relative file. */
   file?: string;
+  /** Restricts name-based queries to the symbol defined on this 1-based line (same-name symbols in one file). */
+  line?: number;
   /** Kind label for `search`, e.g. "Method". */
   kind?: string;
   /** Row limit for `search`. */
   limit?: number;
 }
 
-const SYM = "(s:Symbol {external: false}) WHERE s.name = $arg AND ($file IS NULL OR s.file = $file)";
+const SYM =
+  "(s:Symbol {external: false}) WHERE s.name = $arg AND ($file IS NULL OR s.file = $file) AND ($line IS NULL OR s.line = $line)";
 
 /** The kind label next to `Symbol`, e.g. "Method". */
 const kindOf = (v: string) => `[l IN labels(${v}) WHERE l <> 'Symbol'][0]`;
@@ -92,9 +95,16 @@ export async function runQuery(conn: Connection, cmd: string, arg: string, opts:
   const { rows } = await conn.queryAsync(commands[cmd](opts), {
     arg,
     file: opts.file ?? null,
+    line: opts.line ?? null,
     limit: Math.max(1, Math.min(opts.limit ?? 50, 500)),
   });
   return rows;
+}
+
+/** Whether `path` (project-relative) is a file in the graph. */
+export async function isIndexedFile(conn: Connection, path: string): Promise<boolean> {
+  const { rows } = await conn.queryAsync("MATCH (f:File {path: $path}) RETURN f.path AS path LIMIT 1", { path });
+  return rows.length > 0;
 }
 
 export interface Project {

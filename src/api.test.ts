@@ -24,6 +24,15 @@ describe("handleApi", () => {
     expect((await call("/api/query?cmd=callers")).status).toBe(400);
   });
 
+  it("rejects a `line` that isn't a line number", async () => {
+    expect((await call("/api/query?cmd=find&arg=x&line=abc")).status).toBe(400);
+    expect((await call("/api/query?cmd=find&arg=x&line=0")).status).toBe(400);
+  });
+
+  it("requires a path for /api/file", async () => {
+    expect((await call("/api/file")).status).toBe(400);
+  });
+
   it("404s unknown routes", async () => {
     expect((await call("/api/nope")).status).toBe(404);
   });

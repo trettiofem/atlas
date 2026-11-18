@@ -1,10 +1,11 @@
-import { ChevronRight, CircleCheck, File, LoaderCircle, Plus, Waypoints, X } from "lucide-react";
-import { type Ref, useEffect, useRef, useState } from "react";
+import { ChevronRight, CircleCheck, File, Plus, Waypoints } from "lucide-react";
+import { useState } from "react";
 import { AgentIcon } from "@/agent-icon";
+import { Step, UserMessage } from "@/chat";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { AGENTS, type Agent, type FileRef, type LineRange, SOURCES, type Turn } from "@/mock";
+import { AGENTS, type Agent, SOURCES, type Turn } from "@/mock";
 import { PromptBox } from "@/prompt-box";
+import { CodeLines, type FileRef, SourcePanel } from "@/source";
 
 const STEP_ICON = { graph: Waypoints, thought: CircleCheck };
 
@@ -64,7 +65,9 @@ function Conversation({ agent }: { agent: Agent }) {
           <PromptBox value={prompt} onValueChange={setPrompt} onSubmit={() => {}} className="min-h-10" />
         </div>
       </section>
-      {file && <SourcePanel file={file} onClose={() => setFile(null)} />}
+      {file && (
+        <SourcePanel file={file} text={SOURCES[file.path]?.code ?? null} startLine={SOURCES[file.path]?.startLine} onClose={() => setFile(null)} />
+      )}
     </>
   );
 }
@@ -72,17 +75,9 @@ function Conversation({ agent }: { agent: Agent }) {
 function TurnView({ turn, onOpenFile }: { turn: Turn; onOpenFile: (file: FileRef) => void }) {
   switch (turn.type) {
     case "user":
-      return <p className="ml-auto w-fit max-w-[80%] rounded-md border px-2.5 py-1.5 whitespace-pre-wrap shadow-raised">{turn.text}</p>;
-    case "step": {
-      const Icon = turn.duration ? STEP_ICON[turn.kind] : LoaderCircle;
-      return (
-        <p className="flex items-center gap-2 text-muted-foreground">
-          <Icon className={cn("size-4 shrink-0", !turn.duration && "motion-safe:animate-spin")} />
-          {turn.label}
-          {turn.duration && ` · ${turn.duration}`}
-        </p>
-      );
-    }
+      return <UserMessage>{turn.text}</UserMessage>;
+    case "step":
+      return <Step icon={STEP_ICON[turn.kind]} label={turn.label} duration={turn.duration} />;
     case "answer":
       return <div className="space-y-2 [&_ul]:list-disc [&_ul]:pl-5">{turn.body}</div>;
     case "file": {
@@ -111,64 +106,4 @@ function TurnView({ turn, onOpenFile }: { turn: Turn; onOpenFile: (file: FileRef
       );
     }
   }
-}
-
-/** Beside the conversation on desktop, over it on mobile. Scrolls to the highlighted lines on every open. */
-function SourcePanel({ file, onClose }: { file: FileRef; onClose: () => void }) {
-  const source = SOURCES[file.path];
-  const pre = useRef<HTMLPreElement>(null);
-  useEffect(() => {
-    const hit = pre.current?.querySelector("[data-highlight]");
-    if (hit) hit.scrollIntoView({ block: "center" });
-    else pre.current?.scrollTo(0, 0);
-  }, [file]);
-  return (
-    <aside aria-label={file.path} className="absolute inset-0 flex flex-col bg-background md:static md:w-[min(30rem,40%)] md:shrink-0 md:border-l">
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b pr-2 pl-4">
-        <File className="size-4 shrink-0 text-muted-foreground" />
-        <h2 className="truncate font-mono">{file.path}</h2>
-        <Button variant="ghost" size="icon-sm" className="ml-auto text-muted-foreground" aria-label="Close source" onClick={onClose}>
-          <X />
-        </Button>
-      </header>
-      {source ? (
-        <CodeLines ref={pre} code={source.code.split("\n")} startLine={source.startLine} highlight={file.lines} className="flex-1 py-4" />
-      ) : (
-        <p className="m-auto text-muted-foreground">Source not available.</p>
-      )}
-    </aside>
-  );
-}
-
-/** Mono code with a line-number gutter. Lines inside `highlight` get the agent highlight: a blue tint and left edge. */
-function CodeLines({
-  code,
-  startLine,
-  highlight,
-  className,
-  ref,
-}: {
-  code: string[];
-  startLine: number;
-  highlight?: LineRange;
-  className?: string;
-  ref?: Ref<HTMLPreElement>;
-}) {
-  return (
-    <pre ref={ref} className={cn("overflow-auto text-xs", className)}>
-      {/* w-max: a highlight spans the widest line, not just the visible width. */}
-      <code className="block w-max min-w-full">
-        {code.map((line, i) => {
-          const n = startLine + i;
-          const hit = highlight && n >= highlight[0] && n <= highlight[1];
-          return (
-            <span key={n} data-highlight={hit || undefined} className={cn("block border-l-2 border-transparent pr-4", hit && "border-blue bg-blue/10")}>
-              <span className="inline-block w-12 pr-4 text-right text-muted-foreground select-none">{n}</span>
-              {line}
-            </span>
-          );
-        })}
-      </code>
-    </pre>
-  );
 }

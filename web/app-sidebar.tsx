@@ -1,5 +1,5 @@
-import { Bot, File, House, type LucideIcon, Search, Waypoints } from "lucide-react";
-import { AgentIcon, type AgentStatus } from "@/agent-icon";
+import { Bot, House, type LucideIcon, Search, Waypoints } from "lucide-react";
+import { AgentIcon } from "@/agent-icon";
 import logo from "@/assets/Logo.svg";
 import wordmark from "@/assets/LogoWordmark.svg";
 import {
@@ -14,8 +14,9 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
 import { AGENTS } from "@/mock";
+import { useRecentSymbols } from "@/recent";
+import { SymbolIcon, searchHref } from "@/symbol";
 
 export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
   { path: "/", title: "Home", icon: House },
@@ -24,16 +25,9 @@ export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
   { path: "/graph", title: "Code Graph", icon: Waypoints },
 ];
 
-type Recent = { kind: "symbol"; name: string; href: string } | { kind: "agent"; title: string; status: AgentStatus; href: string };
-
-// shortcut: mock data; replace when recently used symbols and agents are tracked.
-const LATEST: Recent[] = [
-  { kind: "symbol", name: "_minColorDistance", href: "#/search" },
-  ...AGENTS.map((a) => ({ kind: "agent" as const, title: a.title, status: a.status, href: `#/agents/${a.id}` })),
-];
-
 // Collapsed ("icon") mode: the mark replaces the wordmark, the trigger moves to the footer and Latest hides.
 export function AppSidebar({ route }: { route: string }) {
+  const symbols = useRecentSymbols();
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex-row items-center justify-between px-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
@@ -61,14 +55,23 @@ export function AppSidebar({ route }: { route: string }) {
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <SidebarGroupLabel>Latest</SidebarGroupLabel>
           <SidebarMenu>
-            {LATEST.map((item, i) => (
-              <SidebarMenuItem key={i}>
+            {symbols.map((s) => (
+              <SidebarMenuItem key={`${s.file}:${s.line}:${s.name}`}>
                 <SidebarMenuButton asChild>
-                  <a href={item.href}>
-                    {item.kind === "symbol" ? <File className="text-muted-foreground" /> : <AgentIcon status={item.status} />}
-                    <span className={cn(item.kind === "symbol" && "font-mono")}>
-                      {item.kind === "symbol" ? item.name : item.title}
-                    </span>
+                  <a href={searchHref({ q: s.name, name: s.name, file: s.file, line: s.line })} title={`${s.file}:${s.line}`}>
+                    <SymbolIcon kind={s.kind} />
+                    <span className="font-mono">{s.name}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+            {/* shortcut: mock agents; replace once agents are tracked. */}
+            {AGENTS.map((a) => (
+              <SidebarMenuItem key={a.id}>
+                <SidebarMenuButton asChild>
+                  <a href={`#/agents/${a.id}`}>
+                    <AgentIcon status={a.status} />
+                    <span>{a.title}</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>

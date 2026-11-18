@@ -5,8 +5,9 @@ import { Agents } from "@/agents";
 import { AppSidebar, NAV } from "@/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Home } from "@/home";
+import { Search } from "@/search";
 
-// The page lives in the URL hash (#/agents/billing), so links, Back and reload all work.
+// The page lives in the URL hash (#/agents/billing, #/search?q=color), so links, Back and reload all work.
 const subscribe = (onChange: () => void) => {
   addEventListener("hashchange", onChange);
   return () => removeEventListener("hashchange", onChange);
@@ -14,7 +15,8 @@ const subscribe = (onChange: () => void) => {
 const useRoute = () => useSyncExternalStore(subscribe, () => location.hash.slice(1) || "/");
 
 function App() {
-  const [, section = "", id] = useRoute().split("/");
+  const [route, query = ""] = useRoute().split("?");
+  const [, section = "", id] = route.split("/");
   const path = `/${section}`;
   const page = NAV.find((n) => n.path === path);
   return (
@@ -26,6 +28,8 @@ function App() {
         <SidebarTrigger className="m-2 shrink-0 text-muted-foreground md:hidden" />
         {path === "/" ? (
           <Home />
+        ) : path === "/search" ? (
+          <Search params={new URLSearchParams(query)} />
         ) : path === "/agents" ? (
           <Agents id={id} />
         ) : (
