@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useSyncExternalStore } from "react";
 import { createCssVariablesTheme, createHighlighterCore, type HighlighterCore, type ThemedToken } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { bundledLanguages } from "shiki/langs";
@@ -57,14 +57,18 @@ function tokenize(text: string, lang: string): Entry {
 export function useTokens(text: string, path: string | undefined): ThemedToken[][] | undefined {
   const lang = path && languageOf(path);
   const entry = lang ? tokenize(text, lang) : undefined;
-  const [, rerender] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    if (!entry || entry.tokens !== undefined) return;
-    let live = true;
-    entry.ready.then(() => live && rerender());
-    return () => {
-      live = false;
-    };
-  }, [entry]);
-  return entry?.tokens ?? undefined;
+  // The cache fills in outside React. An effect misses a result that lands after this render and before the effect.
+  const tokens = () => entry?.tokens ?? undefined;
+  return useSyncExternalStore(
+    (notify) => {
+      if (!entry || entry.tokens !== undefined) return () => {};
+      let live = true;
+      entry.ready.then(() => live && notify());
+      return () => {
+        live = false;
+      };
+    },
+    tokens,
+    tokens,
+  );
 }

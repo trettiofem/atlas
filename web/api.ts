@@ -114,8 +114,9 @@ export async function fetchJson<T>(url: string, { body, signal }: { body?: unkno
   const init: RequestInit =
     body === undefined ? { signal } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal };
   const res = await fetch(url, init);
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, json.error ?? res.statusText);
+  // An aborted body must reject. Swallowing it as `{}` stores a blank payload and the view stays on Loading.
+  const json = await res.json();
+  if (!res.ok) throw new ApiError(res.status, json?.error ?? res.statusText);
   return json as T;
 }
 
@@ -131,14 +132,24 @@ export function useApi<T>(url: string | null) {
   useEffect(() => {
     if (!url) return;
     const abort = new AbortController();
+    // Strict Mode runs the effect, cancels it, and runs it again. A response from the cancelled run
+    // can still resolve and must not overwrite the live one, or `state.url` no longer matches and loading sticks.
+    let ignore = false;
     getJson<T>(url, abort.signal).then(
       (data) => {
+        if (ignore) return;
         setState({ url, data });
         setLatest(data);
       },
-      (e) => abort.signal.aborted || setState({ url, error: e instanceof ApiError ? e : new ApiError(0, String(e)) }),
+      (e) => {
+        if (ignore || abort.signal.aborted) return;
+        setState({ url, error: e instanceof ApiError ? e : new ApiError(0, String(e)) });
+      },
     );
-    return () => abort.abort();
+    return () => {
+      ignore = true;
+      abort.abort();
+    };
   }, [url]);
   const current = state.url === url;
   return {
