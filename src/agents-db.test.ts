@@ -6,6 +6,7 @@ const agent = (over: Partial<AgentRecord> = {}): AgentRecord => ({
   id: "a1",
   title: "Who calls buildGraph",
   description: "Find the callers of buildGraph.",
+  named: true,
   status: "working",
   createdAt: 1000,
   updatedAt: 2000,
@@ -36,5 +37,15 @@ describe("AgentsDb", () => {
     const [newest, first] = db.load();
     expect(newest.id).toBe("a2");
     expect(first).toMatchObject({ status: "ready", turns: [{ type: "user", text: "Hi" }] });
+  });
+
+  it("deletes an agent with its turns", () => {
+    const store = Database.open(":memory:");
+    const db = new AgentsDb(store);
+    db.save(agent());
+    db.save(agent({ id: "a2" }));
+    db.delete("a1");
+    expect(db.load().map((a) => a.id)).toEqual(["a2"]);
+    expect(store.connect().query("MATCH (t:Turn) RETURN t").rows).toHaveLength(agent().turns.length);
   });
 });

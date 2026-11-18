@@ -81,6 +81,8 @@ export interface Agent {
   id: string;
   title: string;
   description: string;
+  /** False while Claude names it; until then the title and description are the prompt. */
+  named: boolean;
   status: "ready" | "working";
   createdAt: number;
   updatedAt: number;
@@ -129,9 +131,14 @@ export const graphUrl = (route: string, params: Record<string, string | number |
 };
 
 /** GETs, or POSTs `body` as JSON, and throws an ApiError for an error status. */
-export async function fetchJson<T>(url: string, { body, signal }: { body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+export async function fetchJson<T>(
+  url: string,
+  { body, method, signal }: { body?: unknown; method?: string; signal?: AbortSignal } = {},
+): Promise<T> {
   const init: RequestInit =
-    body === undefined ? { signal } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal };
+    body === undefined
+      ? { method, signal }
+      : { method: method ?? "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal };
   const res = await fetch(url, init);
   // An aborted body must reject. Swallowing it as `{}` stores a blank payload and the view stays on Loading.
   const json = await res.json();

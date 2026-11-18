@@ -17,6 +17,13 @@ function connect() {
     emit();
   });
   source.addEventListener("agent", (e) => upsert(JSON.parse(e.data)));
+  source.addEventListener("delete", (e) => remove(JSON.parse(e.data).id));
+}
+
+function remove(id: string) {
+  if (!agents.some((a) => a.id === id)) return;
+  agents = agents.filter((a) => a.id !== id);
+  emit();
 }
 
 function upsert(agent: Agent) {
@@ -45,6 +52,12 @@ export async function createAgent(prompt: string): Promise<Agent> {
   // Shown right away, before the stream catches up.
   upsert(agent);
   return agent;
+}
+
+/** Deletes an agent, stopping it if it's working. */
+export async function deleteAgent(id: string) {
+  await fetchJson(`/api/agents/${id}`, { method: "DELETE" });
+  remove(id);
 }
 
 export const sendMessage = (id: string, prompt: string) => fetchJson(`/api/agents/${id}/messages`, { body: { prompt } });

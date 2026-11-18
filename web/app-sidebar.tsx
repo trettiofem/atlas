@@ -16,6 +16,7 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { USER } from "@/mock";
 import { useRecentSymbols } from "@/recent";
 import { SymbolIcon, searchHref } from "@/symbol";
@@ -75,7 +76,14 @@ export function AppSidebar({ route }: { route: string }) {
                 <SidebarMenuButton asChild>
                   <a href={`#/agents/${a.id}`}>
                     <AgentIcon status={a.status} />
-                    <span>{a.title}</span>
+                    {a.named ? (
+                      <span>{a.title}</span>
+                    ) : (
+                      <>
+                        <Skeleton aria-hidden className="h-3.5 flex-1 bg-border" />
+                        <span className="sr-only">{a.title}</span>
+                      </>
+                    )}
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>

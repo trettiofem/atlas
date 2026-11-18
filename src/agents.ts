@@ -23,10 +23,15 @@ function store() {
   const db = AgentsDb.open();
   const agents = new Map(db.load().map((a) => [a.id, a]));
   for (const agent of agents.values()) {
-    if (agent.status !== "working") continue;
-    settle(agent);
-    agent.turns.push({ type: "error", text: "Interrupted: the server stopped while this agent was working." });
-    db.save(agent);
+    const unnamed = !agent.named;
+    // The naming request died with the previous server, so the prompt stays the name.
+    agent.named = true;
+    const working = agent.status === "working";
+    if (working) {
+      settle(agent);
+      agent.turns.push({ type: "error", text: "Interrupted: the server stopped while this agent was working." });
+    }
+    if (unnamed || working) db.save(agent);
   }
   state = { db, agents };
   return state;
@@ -51,16 +56,21 @@ function settle(agent: AgentRecord) {
   }
 }
 
-type Listener = (agent: Agent) => void;
+type Listener = (event: { type: "agent"; agent: Agent } | { type: "delete"; id: string }) => void;
 const listeners = new Set<Listener>();
 const pending = new Set<string>();
 let timer: NodeJS.Timeout | undefined;
+/** Aborts each working agent's run. */
+const runs = new Map<string, AbortController>();
 
-/** Streams agent changes, at most one per agent every 100ms. Returns the unsubscribe function. */
+/** Streams agent changes, at most one per agent every 100ms, and deletions. Returns the unsubscribe function. */
 export function subscribe(listener: Listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+/** False once the agent is deleted, so a run or naming that finishes later doesn't save it again. */
+const exists = (agent: AgentRecord) => state?.agents.get(agent.id) === agent;
 
 function notify(agent: AgentRecord) {
   agent.updatedAt = Date.now();
@@ -69,7 +79,7 @@ function notify(agent: AgentRecord) {
     timer = undefined;
     for (const id of pending) {
       const changed = state?.agents.get(id);
-      if (changed) for (const listener of listeners) listener(publicAgent(changed));
+      if (changed) for (const listener of listeners) listener({ type: "agent", agent: publicAgent(changed) });
     }
     pending.clear();
   }, NOTIFY_MS);
@@ -84,20 +94,26 @@ async function run(agent: AgentRecord, prompt: string) {
   agent.status = "working";
   db.save(agent);
   notify(agent);
+  const abort = new AbortController();
+  runs.set(agent.id, abort);
   try {
     await runAgent({
       history: agent.history,
       turns: agent.turns,
       onChange: (settled) => {
-        if (settled) db.save(agent);
+        if (settled && exists(agent)) db.save(agent);
         notify(agent);
       },
+      signal: abort.signal,
     });
   } finally {
-    settle(agent);
-    db.save(agent);
-    db.checkpoint();
-    notify(agent);
+    runs.delete(agent.id);
+    if (exists(agent)) {
+      settle(agent);
+      db.save(agent);
+      db.checkpoint();
+      notify(agent);
+    }
   }
 }
 
@@ -105,12 +121,23 @@ async function run(agent: AgentRecord, prompt: string) {
 export function createAgent(prompt: string): Agent {
   const now = Date.now();
   const title = prompt.length > MAX_TITLE ? `${prompt.slice(0, MAX_TITLE - 1).trimEnd()}…` : prompt;
-  const agent: AgentRecord = { id: randomUUID(), title, description: prompt, status: "working", createdAt: now, updatedAt: now, turns: [], history: [] };
+  const agent: AgentRecord = {
+    id: randomUUID(),
+    title,
+    description: prompt,
+    named: false,
+    status: "working",
+    createdAt: now,
+    updatedAt: now,
+    turns: [],
+    history: [],
+  };
   store().agents.set(agent.id, agent);
   void run(agent, prompt);
   void nameAgent(prompt).then((named) => {
-    if (!named) return;
-    Object.assign(agent, named);
+    if (!exists(agent)) return;
+    // If naming failed, the prompt stays the name.
+    Object.assign(agent, named, { named: true });
     store().db.save(agent);
     notify(agent);
   });
@@ -123,6 +150,17 @@ export function sendMessage(id: string, prompt: string): boolean | undefined {
   if (!agent) return undefined;
   if (agent.status === "working") return false;
   void run(agent, prompt);
+  return true;
+}
+
+/** Deletes an agent, stopping it if it's working. False for an unknown agent. */
+export function deleteAgent(id: string): boolean {
+  const { db, agents } = store();
+  if (!agents.delete(id)) return false;
+  runs.get(id)?.abort();
+  db.delete(id);
+  db.checkpoint();
+  for (const listener of listeners) listener({ type: "delete", id });
   return true;
 }
 

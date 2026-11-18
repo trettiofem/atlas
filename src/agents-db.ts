@@ -15,6 +15,8 @@ export interface AgentRecord {
   id: string;
   title: string;
   description: string;
+  /** False while Claude names it; until then the title and description are the prompt. */
+  named: boolean;
   status: AgentStatus;
   /** Milliseconds since the epoch. */
   createdAt: number;
@@ -74,6 +76,7 @@ export class AgentsDb {
         id: String(a.id),
         title: String(a.title),
         description: String(a.description),
+        named: a.named !== false,
         status: a.status === "working" ? "working" : "ready",
         createdAt: Number(a.createdAt),
         updatedAt: Number(a.updatedAt),
@@ -98,6 +101,10 @@ export class AgentsDb {
       this.conn.rollback();
       throw e;
     }
+  }
+
+  delete(id: string) {
+    this.conn.query("MATCH (a:Agent {id: $id}) OPTIONAL MATCH (a)-[:HAS_TURN]->(t:Turn) DETACH DELETE a, t", { id });
   }
 
   /** Compacts the write-ahead log, which otherwise grows with every save. */

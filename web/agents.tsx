@@ -1,11 +1,15 @@
-import { Bot, Plus, Search as SearchIcon } from "lucide-react";
+import { Bot, Plus, Search as SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AgentIcon } from "@/agent-icon";
-import { createAgent, sendMessage, useAgents } from "@/agents-store";
+import { createAgent, deleteAgent, sendMessage, useAgents } from "@/agents-store";
 import { type Agent, type FileText, fileUrl, useApi } from "@/api";
 import avatar from "@/assets/User.svg";
 import { Transcript } from "@/chat";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ExplainDialog, ExplainTip } from "@/explain";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { fuzzyFilter } from "@/fuzzy";
@@ -71,10 +75,21 @@ export function Agents({ id }: { id?: string }) {
                   <img src={avatar} alt={`Created by ${USER.name}`} title={`Created by ${USER.name}`} width={12} height={12} />
                 </span>
               </span>
-              <span className="min-w-0">
-                <span className="block truncate font-semibold">{a.title}</span>
-                <span className="mt-1 line-clamp-6">{a.description}</span>
-              </span>
+              {a.named ? (
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">{a.title}</span>
+                  <span className="mt-1 line-clamp-6">{a.description}</span>
+                </span>
+              ) : (
+                <div className="min-w-0 flex-1">
+                  <span className="sr-only">{a.title}</span>
+                  <SkeletonLine className="h-4 w-3/4" />
+                  <div className="mt-1">
+                    <SkeletonLine className="w-full" />
+                    <SkeletonLine className="w-2/3" />
+                  </div>
+                </div>
+              )}
             </a>
           ))}
         </nav>
@@ -129,6 +144,64 @@ function NewConversation() {
   );
 }
 
+/** A line of text while the agent is being named, on any background (`bg-accent` vanishes on the open agent's row). */
+function SkeletonLine({ className }: { className?: string }) {
+  return (
+    <div aria-hidden className="flex h-5 items-center">
+      <Skeleton className={cn("h-3.5 bg-border", className)} />
+    </div>
+  );
+}
+
+/** The header's delete button, which asks first. */
+function DeleteAgent({ agent }: { agent: Agent }) {
+  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string>();
+  const confirm = async () => {
+    setDeleting(true);
+    setError(undefined);
+    try {
+      await deleteAgent(agent.id);
+      // Replaced, so Back skips the deleted agent.
+      location.replace("#/agents");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setDeleting(false);
+    }
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon-sm" className="ml-auto text-muted-foreground" aria-label="Delete agent" onClick={() => setOpen(true)}>
+            <Trash2 />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Delete agent</TooltipContent>
+      </Tooltip>
+      <DialogContent showCloseButton={false} className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-base font-bold tracking-tight">Delete this agent?</DialogTitle>
+          <DialogDescription>
+            “{agent.title}” and its conversation will be gone for good.
+            {agent.status === "working" && " It’s still working, so this stops it."}
+          </DialogDescription>
+        </DialogHeader>
+        {error && <p className="text-muted-foreground">{error}</p>}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button variant="primary" onClick={confirm} disabled={deleting}>
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Conversation({ agent }: { agent: Agent }) {
   const [file, setFile] = useState<FileRef | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -162,9 +235,11 @@ function Conversation({ agent }: { agent: Agent }) {
   return (
     <>
       <section aria-label={agent.title} className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-11 shrink-0 items-center gap-2 border-b pr-2 pl-4">
           <AgentIcon status={agent.status} />
-          <h1 className="truncate font-medium">{agent.title}</h1>
+          <h1 className={agent.named ? "truncate font-medium" : "sr-only"}>{agent.title}</h1>
+          {!agent.named && <SkeletonLine className="h-4 w-48" />}
+          <DeleteAgent agent={agent} />
         </header>
         <div
           ref={scroller}

@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { hasApiKey, NO_API_KEY } from "./agent.js";
-import { createAgent, explain, listAgents, parseExplain, sendMessage, subscribe } from "./agents.js";
+import { createAgent, deleteAgent, explain, listAgents, parseExplain, sendMessage, subscribe } from "./agents.js";
 import { NOT_LOADED, reader } from "./db.js";
 import { findPath, findSymbolId, getEdgesAmong, getNeighbors, getNode, isEdgeType, isNodeId, searchNodes } from "./graph.js";
 import { getProject, isIndexedFile, isQueryCommand, overview, runQuery } from "./queries.js";
@@ -13,6 +13,7 @@ const MAX_BODY_BYTES = 1_000_000;
 const MAX_EDGE_IDS = 5000;
 
 const LINE = /^[1-9]\d*$/;
+const AGENT = /^\/api\/agents\/([\w-]+)$/;
 const AGENT_MESSAGES = /^\/api\/agents\/([\w-]+)\/messages$/;
 const MAX_PROMPT = 20_000;
 const STREAM_MS = 100;
@@ -53,9 +54,11 @@ const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
  *   POST /api/graph/edges {ids: [...]}                    every edge between these nodes
  *   GET  /api/graph/path?from=<id>&to=<id>[&types=USES,CONTAINS&directed=1]   a shortest path; no nodes if none
  * and for agents (see src/agents.ts):
- *   GET  /api/agents/events                 SSE: a `snapshot` of every agent, then an `agent` event per change
+ *   GET  /api/agents/events                 SSE: a `snapshot` of every agent, then an `agent` event per change and
+ *                                           a `delete` event {id} per deletion
  *   POST /api/agents {prompt}               creates an agent and starts it; returns the agent
  *   POST /api/agents/<id>/messages {prompt} a follow-up; 409 while the agent is working
+ *   DELETE /api/agents/<id>                 deletes the agent, stopping it if it's working
  *   POST /api/explain {file, lines, name, messages}   NDJSON: the reply's turns so far, one snapshot per line
  */
 export async function handleApi(req: IncomingMessage, res: ServerResponse) {
@@ -138,7 +141,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse) {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
         const event = (name: string, data: unknown) => res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
         event("snapshot", agents);
-        const unsubscribe = subscribe((agent) => event("agent", agent));
+        const unsubscribe = subscribe((e) => (e.type === "agent" ? event("agent", e.agent) : event("delete", { id: e.id })));
         res.on("close", unsubscribe);
         return;
       }
@@ -156,6 +159,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse) {
         if (typeof body === "string") return send(400, { error: body });
         return streamExplain(req, res, body);
       }
+    }
+    const agent = url.pathname.match(AGENT);
+    if (agent) {
+      if (req.method !== "DELETE") return send(405, { error: "Use DELETE" });
+      return deleteAgent(agent[1]) ? send(200, {}) : send(404, { error: "No such agent" });
     }
     const messages = url.pathname.match(AGENT_MESSAGES);
     if (messages) {
