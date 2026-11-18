@@ -17,7 +17,7 @@
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
 
-  /* The raised lip: with `border-2` the bottom reads 4px. A shadow, not border-bottom, so a pressed
+  /* The raised lip: with the 1px `border` the bottom reads 3px. A shadow, not border-bottom, so a pressed
      button (`active:translate-y-0.5 active:shadow-none`) sinks without changing layout. */
   --shadow-raised: 0 2px 0 0 var(--color-neutral-67);
   --shadow-raised-primary: 0 2px 0 0 var(--color-dark-blue);

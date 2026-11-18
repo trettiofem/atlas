@@ -54,7 +54,7 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
 ### Shape and surfaces
 
 - One flat background (neutral-100) everywhere. Sections are separated by 1px neutral-67 borders, never by background colors or drop shadows.
-- **Raised controls**: interactive controls (buttons, text boxes, the prompt box) have a 2px neutral-67 border and a 4px bottom. That's `border-2` plus `shadow-raised`, a solid 2px lip below the border.
+- **Raised controls**: interactive controls (buttons, text boxes, the prompt box) have a 1px neutral-67 border and a 3px bottom. That's `border` plus `shadow-raised`, a solid 2px lip below the border.
   - The `outline` button variant, `InputGroup`, `Input`, `Textarea` and `DialogContent` already include it. Inside `InputGroupButton`, add `className="shadow-raised"` because that component forces `shadow-none`.
   - **Pressed**: raised buttons sink when clicked (`active:translate-y-0.5 active:shadow-none`, already in the `outline` variant). The face drops 2px onto the lip, faking a 3D key.
   - **Toggled**: an `outline` button with `aria-pressed` set to true stays sunk and gets the `accent` fill, like a latched key. Search's kind chips use it. It's in the variant already, so just set `aria-pressed`.
@@ -128,7 +128,7 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
   - It looks like the app's tooltips (`bg-foreground`, `text-background`, `text-xs`, `rounded-md`, with an arrow) plus a `Sparkles` icon and "Explain". It sits flush on top of the highlight, at the start of the code column.
   - It shows while the highlight or the tip is hovered, and on keyboard focus, so it's a real button that Tab reaches.
   - When the highlight starts at the file's first line, it goes underneath instead.
-- **Dialog** (`components/ui/dialog.tsx`): raised like the prompt box (`border-2` plus `shadow-raised`) and `rounded-xl`, over a translucent white overlay (`bg-background/70`) that Sheet uses too. It's 672px wide (`sm:max-w-2xl`) and `min(40rem, 85svh)` tall.
+- **Dialog** (`components/ui/dialog.tsx`): raised like the prompt box (`border` plus `shadow-raised`) and `rounded-xl`, over a translucent white overlay (`bg-background/70`) that Sheet uses too. It's 672px wide (`sm:max-w-2xl`) and `min(40rem, 85svh)` tall.
   - Header (44px): `Sparkles`, then "Explain" and the mono symbol name in `font-medium`. The dialog's ghost close `X` sits in it.
   - Transcript: the muted `path:from-to` with a `File` icon, and a bordered snippet of the lines (the blue highlight, at most 240px tall). Then the user's messages (`UserMessage`, starting with "Explain this code") and a running `Step`, "Thinking…".
   - The prompt box is pinned to the bottom with a top border and gets focus. Follow-ups are added to the transcript.
