@@ -33,6 +33,17 @@ describe("handleApi", () => {
     expect((await call("/api/file")).status).toBe(400);
   });
 
+  it("validates Code Graph parameters", async () => {
+    expect((await call("/api/graph/search")).status).toBe(400);
+    expect((await call("/api/graph/node")).status).toBe(400);
+    expect((await call("/api/graph/node?id=nope")).status).toBe(400);
+    expect((await call("/api/graph/neighbors?id=file:a.ts&type=CALLS")).status).toBe(400);
+    expect((await call("/api/graph/neighbors?id=file:a.ts&dir=up")).status).toBe(400);
+    expect((await call("/api/graph/path?from=file:a.ts")).status).toBe(400);
+    expect((await call("/api/graph/path?from=file:a.ts&to=file:b.ts&types=USES,CALLS")).status).toBe(400);
+    expect((await call("/api/graph/edges")).status).toBe(405);
+  });
+
   it("404s unknown routes", async () => {
     expect((await call("/api/nope")).status).toBe(404);
   });
