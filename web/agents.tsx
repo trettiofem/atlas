@@ -1,8 +1,11 @@
-import { ChevronRight, CircleCheck, File, Plus, Waypoints } from "lucide-react";
+import { ChevronRight, CircleCheck, File, Plus, Search as SearchIcon, Waypoints } from "lucide-react";
 import { useState } from "react";
 import { AgentIcon } from "@/agent-icon";
+import avatar from "@/assets/User.svg";
 import { Step, UserMessage } from "@/chat";
 import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { fuzzyFilter } from "@/fuzzy";
 import { AGENTS, type Agent, SOURCES, type Turn } from "@/mock";
 import { PromptBox } from "@/prompt-box";
 import { CodeLines, type FileRef, SourcePanel } from "@/source";
@@ -15,34 +18,62 @@ export const findAgent = (id?: string) => (id ? AGENTS.find((a) => a.id === id) 
 /** Agent list, conversation and source panel. */
 export function Agents({ id }: { id?: string }) {
   const agent = findAgent(id);
+  const [query, setQuery] = useState("");
+  const q = query.trim();
+  const agents = fuzzyFilter(AGENTS, q, (a) => [a.title, a.description, a.creator.name]);
   return (
     <div className="relative flex min-h-0 flex-1">
-      <nav aria-label="Agents" className="hidden w-62.5 shrink-0 overflow-y-auto border-r md:block">
-        {AGENTS.map((a) => (
-          <a
-            key={a.id}
-            href={`#/agents/${a.id}`}
-            aria-current={a === agent ? "page" : undefined}
-            className="flex gap-2 border-b p-4 hover:bg-accent aria-[current=page]:bg-accent"
-          >
-            <span className="flex h-5 items-center">
-              <AgentIcon status={a.status} />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-semibold">{a.title}</span>
-              <span className="mt-1 line-clamp-6">{a.description}</span>
-            </span>
-          </a>
-        ))}
-        <div className="border-b p-4">
-          {/* New agents start from a prompt on Home. */}
-          <Button variant="primary" className="w-full" asChild>
-            <a href="#/">
-              <Plus /> Create
-            </a>
-          </Button>
+      <div className="hidden w-62.5 shrink-0 flex-col border-r md:flex">
+        <div role="search" className="border-b p-4">
+          <InputGroup>
+            <InputGroupAddon>
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label="Find an agent"
+              placeholder="Find an agent…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </InputGroup>
         </div>
-      </nav>
+        <nav aria-label="Agents" className="flex-1 overflow-y-auto">
+          {agents.length === 0 && <p className="border-b p-4 text-muted-foreground">No agents match “{q}”.</p>}
+          {agents.map((a) => (
+            <a
+              key={a.id}
+              href={`#/agents/${a.id}`}
+              aria-current={a === agent ? "page" : undefined}
+              className="flex gap-2 border-b p-4 hover:bg-accent aria-[current=page]:bg-accent"
+            >
+              <span className="flex w-4 shrink-0 flex-col items-center">
+                <span className="flex h-5 items-center">
+                  <AgentIcon status={a.status} />
+                </span>
+                {/* Level with the description's first line. */}
+                <span className="mt-1 flex h-5 items-center">
+                  <img src={avatar} alt={`Created by ${a.creator.name}`} title={`Created by ${a.creator.name}`} width={12} height={12} />
+                </span>
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{a.title}</span>
+                <span className="mt-1 line-clamp-6">{a.description}</span>
+              </span>
+            </a>
+          ))}
+          <div className="border-b p-4">
+            {/* New agents start from a prompt on Home. */}
+            <Button variant="primary" className="w-full" asChild>
+              <a href="#/">
+                <Plus /> Create
+              </a>
+            </Button>
+          </div>
+        </nav>
+      </div>
       {agent ? <Conversation key={agent.id} agent={agent} /> : <p className="m-auto text-muted-foreground">Agent not found.</p>}
     </div>
   );

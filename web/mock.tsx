@@ -15,10 +15,16 @@ export interface Agent {
   title: string;
   description: string;
   status: AgentStatus;
+  creator: User;
   transcript: Turn[];
 }
 
-export const USER = { name: "Emil Eifrém", org: "Neo4j" };
+export interface User {
+  name: string;
+  org: string;
+}
+
+export const USER: User = { name: "Emil Eifrém", org: "Neo4j" };
 
 export const AGENTS: Agent[] = [
   {
@@ -27,6 +33,7 @@ export const AGENTS: Agent[] = [
     description:
       "Investigate how billing charges are calculated, identify edge cases and inconsistencies, and recommend fixes to ensure accurate, reliable invoices.",
     status: "ready",
+    creator: USER,
     transcript: [
       { type: "user", text: "What calls the billing ledger reconciliation, and where is it defined?" },
       { type: "step", kind: "graph", label: "Queried code graph", duration: "52ms" },
@@ -73,6 +80,7 @@ export const AGENTS: Agent[] = [
     description:
       "Analyze user engagement trends, identify key behaviors and drop-off points, and recommend improvements to boost retention and activity.",
     status: "working",
+    creator: USER,
     transcript: [
       { type: "user", text: "Which engagement events fire during signup, and where are they tracked?" },
       { type: "step", kind: "graph", label: "Queried code graph", duration: "140ms" },

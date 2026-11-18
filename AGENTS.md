@@ -137,7 +137,9 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
 
 `#/agents/<id>` opens that agent, and `#/agents` opens the first. The page has three columns, separated by 1px borders, each scrolling on its own:
 1. **Agent list** (250px, hidden on mobile):
-   - Each agent shows an `AgentIcon`, then its bold one-line title. The description sits underneath, indented to line up with the title, and is cut off after 6 lines.
+ - A top block (`border-b p-4`) with a raised `InputGroup` like Search's: a `Search` icon and "Find an agent…". It filters the list as you type (Escape clears it) with `fuzzyFilter` from [web/fuzzy.ts](web/fuzzy.ts). Every query word has to match a word in the title, description or creator's name, by prefix, inside the word, with letters missing or with a typo, and title matches rank first. With no match it says "No agents match “x”."
+ - Each agent shows an `AgentIcon`, then its bold one-line title. The description sits underneath, indented to line up with the title, and is cut off after 6 lines.
+ - Under the `AgentIcon`, level with the description's first line, the 12px `User.svg` avatar shows who created the agent (`creator`, with "Created by …" as its alt text and tooltip). For now it's always the mock `USER`.
    - A border separates agents. The open agent gets the `accent` fill.
    - A full-width `primary` "+ Create" button below the list goes to Home, where new agents start.
 2. **Conversation**:
