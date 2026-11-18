@@ -25,21 +25,29 @@ export function Agents({ id }: { id?: string }) {
   return (
     <div className="relative flex min-h-0 flex-1">
       <div className="hidden w-80 shrink-0 flex-col border-r md:flex">
-        <div role="search" className="border-b p-4">
-          <InputGroup>
-            <InputGroupAddon>
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label="Find an agent"
-              placeholder="Find an agent…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </InputGroup>
+        <div className="flex items-center gap-2 border-b p-4">
+          <div role="search" className="min-w-0 flex-1">
+            <InputGroup>
+              <InputGroupAddon>
+                <SearchIcon />
+              </InputGroupAddon>
+              <InputGroupInput
+                aria-label="Find an agent"
+                placeholder="Find an agent…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </InputGroup>
+          </div>
+          {/* New agents start from a prompt on Home. */}
+          <Button variant="primary" size="icon" aria-label="Create" asChild>
+            <a href="#/">
+              <Plus />
+            </a>
+          </Button>
         </div>
         <nav aria-label="Agents" className="flex-1 overflow-y-auto">
           {agents.length === 0 && <p className="border-b p-4 text-muted-foreground">No agents match “{q}”.</p>}
@@ -65,14 +73,6 @@ export function Agents({ id }: { id?: string }) {
               </span>
             </a>
           ))}
-          <div className="border-b p-4">
-            {/* New agents start from a prompt on Home. */}
-            <Button variant="primary" className="w-full" asChild>
-              <a href="#/">
-                <Plus /> Create
-              </a>
-            </Button>
-          </div>
         </nav>
       </div>
       {agent ? <Conversation key={agent.id} agent={agent} /> : <p className="m-auto text-muted-foreground">Agent not found.</p>}
