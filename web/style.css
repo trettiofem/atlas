@@ -57,6 +57,21 @@
   --sidebar-accent-foreground: var(--color-neutral-0);
   --sidebar-border: var(--color-neutral-67);
   --sidebar-ring: var(--color-blue);
+
+  /* Syntax colors for code views (Shiki's CSS-variables theme, see web/highlight.ts). Salmon and the muted gray
+     are darkened or lightened just enough to keep 4.5:1 contrast on the background. */
+  --syntax-foreground: var(--color-neutral-0);
+  --syntax-background: var(--color-neutral-100);
+  --syntax-token-keyword: var(--color-dark-blue);
+  --syntax-token-function: var(--color-blue);
+  --syntax-token-link: var(--color-blue);
+  --syntax-token-string: color-mix(in oklab, var(--color-salmon) 60%, var(--color-neutral-0));
+  --syntax-token-string-expression: var(--syntax-token-string);
+  /* Shiki's "constant" also covers `const` names, objects and property names, so it stays plain. */
+  --syntax-token-constant: var(--color-neutral-0);
+  --syntax-token-comment: color-mix(in oklab, var(--color-neutral-33) 80%, var(--color-neutral-100));
+  --syntax-token-parameter: var(--color-neutral-0);
+  --syntax-token-punctuation: var(--color-neutral-33);
 }
 
 @theme inline {

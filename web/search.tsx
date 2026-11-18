@@ -272,6 +272,7 @@ function SymbolView({ state, symbol }: { state: SearchState; symbol: SymbolRef }
               {lines && source.data ? (
                 <SourceText
                   text={source.data.text}
+                  path={symbol.file}
                   highlight={lines}
                   highlightAction={<ExplainTip below={lines[0] === 1} onClick={() => setExplaining(true)} />}
                   className="flex-1 py-4"

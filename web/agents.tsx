@@ -99,8 +99,10 @@ function TurnView({ turn, onOpenFile }: { turn: Turn; onOpenFile: (file: FileRef
           </Button>
           {source && lines && (
             <CodeLines
-              code={source.code.split("\n").slice(lines[0] - source.startLine, lines[1] - source.startLine + 1)}
-              startLine={lines[0]}
+              text={source.code}
+              path={path}
+              startLine={source.startLine}
+              only={lines}
               highlight={lines}
               className="rounded-md border py-1.5"
             />

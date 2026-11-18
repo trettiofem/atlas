@@ -1,5 +1,5 @@
 import { CircleCheck, File, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Step, UserMessage } from "@/chat";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -62,7 +62,6 @@ export function ExplainDialog({
 }
 
 function ExplainChat({ name, file, text, lines }: { name: string; file: string; text: string; lines: LineRange }) {
-  const code = useMemo(() => text.split("\n").slice(lines[0] - 1, lines[1]), [text, lines]);
   const [prompts, setPrompts] = useState(["Explain this code"]);
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
@@ -87,7 +86,7 @@ function ExplainChat({ name, file, text, lines }: { name: string; file: string; 
               {file}:{lines[0] === lines[1] ? lines[0] : lines.join("-")}
             </span>
           </p>
-          <CodeLines code={code} startLine={lines[0]} highlight={lines} className="max-h-60 rounded-md border py-1.5" />
+          <CodeLines text={text} path={file} startLine={1} only={lines} highlight={lines} className="max-h-60 rounded-md border py-1.5" />
         </div>
         {prompts.map((prompt, i) => (
           <UserMessage key={i}>{prompt}</UserMessage>

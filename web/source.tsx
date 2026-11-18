@@ -1,6 +1,7 @@
 import { File, X } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { useTokens } from "@/highlight";
 import { cn } from "@/lib/utils";
 
 /** Inclusive, 1-based line numbers in a file. */
@@ -35,7 +36,7 @@ export function SourcePanel({
       </header>
       {text != null ? (
         // A fresh `file` per open, so reopening the same reference scrolls back to its lines.
-        <SourceText text={text} startLine={startLine} highlight={file.lines} reveal={file} className="flex-1 py-4" />
+        <SourceText text={text} path={file.path} startLine={startLine} highlight={file.lines} reveal={file} className="flex-1 py-4" />
       ) : (
         <p className="m-auto text-muted-foreground">{text === undefined ? "Loading…" : "Source not available."}</p>
       )}
@@ -46,6 +47,7 @@ export function SourcePanel({
 /** A whole file. Scrolls the highlighted lines to the center when `reveal` changes, or to the top without a highlight. */
 export function SourceText({
   text,
+  path,
   startLine = 1,
   highlight,
   highlightAction,
@@ -53,52 +55,76 @@ export function SourceText({
   className,
 }: {
   text: string;
+  path: string;
   startLine?: number;
   highlight?: LineRange;
   highlightAction?: ReactNode;
   reveal?: unknown;
   className?: string;
 }) {
-  const code = useMemo(() => text.split("\n"), [text]);
   const pre = useRef<HTMLPreElement>(null);
   useEffect(() => {
     const hit = pre.current?.querySelector("[data-highlight]");
     if (hit) hit.scrollIntoView({ block: "center" });
     else pre.current?.scrollTo(0, 0);
-  }, [reveal, code]);
-  return <CodeLines ref={pre} code={code} startLine={startLine} highlight={highlight} highlightAction={highlightAction} className={className} />;
+  }, [reveal, text]);
+  return (
+    <CodeLines
+      ref={pre}
+      text={text}
+      path={path}
+      startLine={startLine}
+      highlight={highlight}
+      highlightAction={highlightAction}
+      className={className}
+    />
+  );
 }
 
 /**
- * Mono code with a line-number gutter. Lines inside `highlight` get a blue tint and left edge. They sit in one
- * `group/highlight` block, so `highlightAction` (positioned against it) can show while the highlight is hovered.
+ * Mono code with a line-number gutter, syntax-colored by `path`'s language. Lines inside `highlight` get a blue tint
+ * and left edge. They sit in one `group/highlight` block, so `highlightAction` (positioned against it) can show while
+ * the highlight is hovered. `only` shows just those lines, still colored as part of the whole `text`.
  */
 export function CodeLines({
-  code,
+  text,
+  path,
   startLine,
+  only,
   highlight,
   highlightAction,
   className,
   ref,
 }: {
-  code: string[];
+  text: string;
+  path?: string;
   startLine: number;
+  only?: LineRange;
   highlight?: LineRange;
   highlightAction?: ReactNode;
   className?: string;
   ref?: Ref<HTMLPreElement>;
 }) {
+  const code = useMemo(() => text.split("\n"), [text]);
+  const tokens = useTokens(text, path);
   const [from, to] = highlight ?? [Infinity, Infinity];
   const before: ReactNode[] = [];
   const hits: ReactNode[] = [];
   const after: ReactNode[] = [];
   code.forEach((line, i) => {
     const n = startLine + i;
+    if (only && (n < only[0] || n > only[1])) return;
     const hit = n >= from && n <= to;
     (n < from ? before : hit ? hits : after).push(
       <span key={n} data-highlight={hit || undefined} className={cn("block border-l-2 border-transparent pr-4", hit && "border-blue bg-blue/10")}>
         <span className="inline-block w-12 pr-4 text-right text-muted-foreground select-none">{n}</span>
-        {line}
+        {tokens?.[i]
+          ? tokens[i].map((token, j) => (
+              <span key={j} style={{ color: token.color }}>
+                {token.content}
+              </span>
+            ))
+          : line}
       </span>,
     );
   });

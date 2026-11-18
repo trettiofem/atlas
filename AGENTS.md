@@ -16,7 +16,8 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
   - [web/app-sidebar.tsx](web/app-sidebar.tsx).
   - [web/prompt-box.tsx](web/prompt-box.tsx): the prompt box on Home and Agents.
   - [web/agent-icon.tsx](web/agent-icon.tsx): the status dot.
-  - [web/source.tsx](web/source.tsx): `CodeLines`, `SourceText` (a whole file, scrolled to its highlight) and `SourcePanel`, shared by Agents and Search.
+  - [web/source.tsx](web/source.tsx): `CodeLines`, `SourceText` (a whole file, scrolled to its highlight) and `SourcePanel`, shared by Agents and Search. Every code view goes through `CodeLines`, which takes the whole file's text and path. Snippets pass `only` with their lines, so they're colored in the context of the whole file.
+ - [web/highlight.ts](web/highlight.ts): syntax highlighting with Shiki (`useTokens`). It picks the language from the path's extension, loads that grammar on demand and caches the last 20 files. Code shows plain until the tokens arrive, and stays plain for unknown languages.
   - [web/symbol.tsx](web/symbol.tsx): `SymbolIcon`, kind labels, `PathLabel` and `searchHref`.
   - [web/chat.tsx](web/chat.tsx): `UserMessage` (the raised bubble) and `Step` (an icon, a label and a duration, or a spinner while running), shared by Agents and the Explain chat.
   - [web/explain.tsx](web/explain.tsx): the Explain tip and the Explain chat dialog (`components/ui/dialog.tsx`).
@@ -39,7 +40,8 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
 | `dark-blue` | `#19599A` | Primary button border and lip | none |
 | `salmon` | `#FF7D6E` | **Working** agents | `destructive` (placeholder) |
 
-- **Hover / active fill**: `accent` is neutral-67 mixed 40% into neutral-100. It is the only derived color.
+- **Hover / active fill**: `accent` is neutral-67 mixed 40% into neutral-100. Apart from the syntax colors, it is the only derived color.
+- **Syntax colors**: the `--syntax-*` variables in `style.css` feed Shiki's CSS-variables theme. Keywords are `dark-blue`, functions and types `blue`, strings a darkened salmon, comments a lightened neutral-33 and punctuation neutral-33. Everything else, including Shiki's broad "constant" group, is plain text. The two mixed colors keep 4.5:1 contrast on the background.
 - **Light mode only.** The palette has no dark values yet, so don't add `dark:` styling until it does.
 
 ### Typography
