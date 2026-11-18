@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { kindIcon } from "@/symbol";
 
 cytoscape.use(fcose);
+// Its only warnings here are for edges between chips that overlap for a moment while nodes animate into place.
+cytoscape.warnings(false);
 
 const MONO = '"Geist Mono Variable", ui-monospace, monospace';
 const SANS = '"Geist Variable", ui-sans-serif, system-ui, sans-serif';
