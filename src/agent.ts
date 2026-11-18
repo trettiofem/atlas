@@ -269,7 +269,7 @@ export async function nameAgent(prompt: string): Promise<{ title: string; descri
       type: "object",
       properties: {
         title: { type: "string", description: "Sentence case, at most 6 words, no trailing period, e.g. “Investigation into billing logic”" },
-        description: { type: "string", description: "One or two sentences on what the agent will find out" },
+        description: { type: "string", description: "One short sentence, at most 12 words, on what the agent will find out, e.g. “Finds unused functions and types outside tests”" },
       },
       required: ["title", "description"],
     },
