@@ -1,4 +1,4 @@
-// Neo4j schema for the SCIP code graph. Applied by src/load.ts before every load.
+// RelateDB schema for the SCIP code graph. Applied by src/load.ts before every load.
 // Language-agnostic: everything below comes from SCIP's own model, so any SCIP indexer can feed it.
 // Per-language conventions (test files, which kinds are noise) live in src/languages.ts.
 //

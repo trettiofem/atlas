@@ -41,7 +41,7 @@ export interface FileNode {
 /** SCIP descriptor kinds, from the descriptor suffix: `/` `#` `.` `().` `:` `!` `(x)` `[T]`. */
 export type DescriptorKind = "Namespace" | "Type" | "Term" | "Method" | "Meta" | "Macro" | "Parameter" | "TypeParameter";
 
-/** Descriptor kinds that become nodes; each is a Neo4j label next to `Symbol`, e.g. `(:Symbol:Method)`. */
+/** Descriptor kinds that become nodes; each is a node label next to `Symbol`, e.g. `(:Symbol:Method)`. */
 export const NODE_KINDS = [
     "Namespace", "Type", "Term", "Method", "Parameter", "TypeParameter", "Macro", "Meta",
 ] as const;
@@ -50,7 +50,7 @@ export type NodeKind = (typeof NODE_KINDS)[number];
 export interface SymbolNode {
     id: string;
     name: string;
-    /** Neo4j label; undefined when the descriptor can't be parsed (the node is then only `:Symbol`). */
+    /** Node label; undefined when the descriptor can't be parsed (the node is then only `:Symbol`). */
     kind?: NodeKind;
     /** Detailed SCIP kind (e.g. "Class", "Trait", "Constructor") when the indexer provides one. */
     scipKind?: string;

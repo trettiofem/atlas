@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import type { Row } from "./queries.js";
 
 /** Most lines returned for one definition. */
 export const MAX_LINES = 200;
@@ -35,6 +37,22 @@ export function resolveInRoot(root: string, file: string): string {
   const path = resolve(root, file);
   if (!isInside(root, path)) throw new Error(`${file} is outside the project root ${root}`);
   return path;
+}
+
+/** Source of each definition row from the `source` query, read from the project files under `root`. */
+export async function readDefinitions(root: string, rows: Row[]) {
+  const results = [];
+  for (const row of rows) {
+    const path = resolveInRoot(root, String(row.file));
+    const text = await readFile(path, "utf8").catch(() => undefined);
+    if (text === undefined) {
+      results.push({ ...row, path, error: "file not readable; the graph may be stale" });
+      continue;
+    }
+    const slice = sliceLines(text, Number(row.line), typeof row.endLine === "number" ? row.endLine : undefined);
+    results.push({ kind: row.kind, name: row.name, file: row.file, path, ...slice });
+  }
+  return results;
 }
 
 /** Graph paths are project-relative with `/` separators; accept absolute paths under `root` too. */

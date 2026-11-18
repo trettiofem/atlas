@@ -1,0 +1,82 @@
+@import "tailwindcss" source(".");
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/* Atlas palette (see AGENTS.md). Light only: the palette has no dark values yet. */
+@theme {
+  --color-neutral-*: initial;
+  --color-neutral-0: #0c0a09; /* text */
+  --color-neutral-33: #44403b; /* icons, muted text */
+  --color-neutral-67: #d6d3d1; /* borders */
+  --color-neutral-100: #fafaf9; /* background */
+  --color-blue: #2176cc; /* logo, ready agents */
+  --color-salmon: #ff7d6e; /* working agents */
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  /* The raised lip: with `border-2` the bottom reads 4px. A shadow, not border-bottom, so a pressed
+     button (`active:translate-y-0.5 active:shadow-none`) sinks without changing layout. */
+  --shadow-raised: 0 2px 0 0 var(--color-neutral-67);
+}
+
+/* shadcn semantic tokens, all mapped onto the palette. */
+:root {
+  --radius: 0.5rem;
+  --background: var(--color-neutral-100);
+  --foreground: var(--color-neutral-0);
+  --primary: var(--color-neutral-0);
+  --primary-foreground: var(--color-neutral-100);
+  --secondary: var(--accent);
+  --secondary-foreground: var(--color-neutral-0);
+  /* Hover fill: the palette has none, so mix border into background. */
+  --accent: color-mix(in oklab, var(--color-neutral-67) 40%, var(--color-neutral-100));
+  --accent-foreground: var(--color-neutral-0);
+  --muted-foreground: var(--color-neutral-33);
+  --destructive: var(--color-salmon);
+  --border: var(--color-neutral-67);
+  --input: var(--color-neutral-67);
+  --ring: var(--color-neutral-33);
+  --sidebar: var(--color-neutral-100);
+  --sidebar-foreground: var(--color-neutral-0);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--color-neutral-0);
+  --sidebar-border: var(--color-neutral-67);
+  --sidebar-ring: var(--color-neutral-33);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-sm text-foreground antialiased;
+  }
+}

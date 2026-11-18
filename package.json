@@ -5,9 +5,10 @@
   "main": "src/main.ts",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc",
+    "typecheck": "tsc && tsc -p web",
     "graph": "tsx src/main.ts",
-    "mcp": "tsx src/mcp.ts"
+    "mcp": "tsx src/mcp.ts",
+    "web": "tsx src/web.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,17 +23,32 @@
   "packageManager": "pnpm@12.14.0",
   "type": "module",
   "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
     "@modelcontextprotocol/sdk": "1.32.1",
+    "@relate/relate": "^1.1.0",
     "@sourcegraph/scip-typescript": "^0.4.0",
-    "neo4j-driver": "^6.2.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.74.0",
     "protobufjs": "^8.8.1",
+    "radix-ui": "^1.8.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "oxlint": "^1.89.0",
+    "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
+    "tw-animate-css": "^1.4.0",
     "typescript": "^7.0.2",
+    "vite": "^8.3.8",
     "vitest": "^5.0.5"
   }
 }

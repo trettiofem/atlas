@@ -1,4 +1,4 @@
-import neo4j, { type Driver } from "neo4j-driver";
+import type { Connection } from "@relate/relate";
 import { NODE_KINDS, type NodeKind } from "./types.js";
 
 export const QUERY_USAGE = `  search <text>     symbols whose name contains the text (--kind to filter by label)
@@ -84,28 +84,17 @@ const commands: Record<string, (o: QueryOptions) => string> = {
      RETURN DISTINCT f.path AS file, f.isTest AS isTest ORDER BY isTest, file`,
 };
 
-/** Converts driver values (Integer, temporal types, nested lists and maps) to plain JSON-friendly values. */
-function plain(v: unknown): unknown {
-  if (neo4j.isInt(v)) return v.toNumber();
-  if (Array.isArray(v)) return v.map(plain);
-  if (v && typeof v === "object") {
-    if (v.constructor !== Object) return String(v); // e.g. DateTime
-    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, plain(x)]));
-  }
-  return v;
-}
-
 export type Row = Record<string, unknown>;
 
-export const isQueryCommand = (cmd: string | undefined): cmd is string => !!cmd && cmd in commands;
+export const isQueryCommand = (cmd: string | undefined): cmd is string => !!cmd && Object.hasOwn(commands, cmd); // not `in`: "constructor" would pass
 
-export async function runQuery(driver: Driver, cmd: string, arg: string, opts: QueryOptions = {}): Promise<Row[]> {
-  const { records } = await driver.executeQuery(
-    commands[cmd](opts),
-    { arg, file: opts.file ?? null, limit: neo4j.int(Math.max(1, Math.min(opts.limit ?? 50, 500))) },
-    { routing: neo4j.routing.READ },
-  );
-  return records.map((r) => Object.fromEntries(r.keys.map((k) => [k, plain(r.get(k))])));
+export async function runQuery(conn: Connection, cmd: string, arg: string, opts: QueryOptions = {}): Promise<Row[]> {
+  const { rows } = await conn.queryAsync(commands[cmd](opts), {
+    arg,
+    file: opts.file ?? null,
+    limit: Math.max(1, Math.min(opts.limit ?? 50, 500)),
+  });
+  return rows;
 }
 
 export interface Project {
@@ -116,28 +105,20 @@ export interface Project {
 }
 
 /** The loaded project, or undefined when nothing has been loaded. */
-export async function getProject(driver: Driver): Promise<Project | undefined> {
-  const { records } = await driver.executeQuery(
-    "MATCH (p:Project) RETURN p { .root, .tool, .toolVersion, .loadedAt } AS p LIMIT 1",
-    {},
-    { routing: neo4j.routing.READ },
+export async function getProject(conn: Connection): Promise<Project | undefined> {
+  const { rows } = await conn.queryAsync(
+    "MATCH (p:Project) RETURN p { .root, .tool, .toolVersion, loadedAt: toString(p.loadedAt) } AS p LIMIT 1",
   );
-  return records.length ? (plain(records[0].get("p")) as Project) : undefined;
+  return rows[0]?.p as Project | undefined;
 }
 
-export async function overview(driver: Driver) {
-  const project = await getProject(driver);
-  const read = { routing: neo4j.routing.READ };
-  const languages = await driver.executeQuery(
+export async function overview(conn: Connection) {
+  const project = await getProject(conn);
+  const languages = await conn.queryAsync(
     "MATCH (f:File) RETURN f.language AS language, count(*) AS files, sum(CASE WHEN f.isTest THEN 1 ELSE 0 END) AS testFiles ORDER BY files DESC",
-    {},
-    read,
   );
-  const kinds = await driver.executeQuery(
+  const kinds = await conn.queryAsync(
     `MATCH (s:Symbol {external: false}) RETURN ${kindOf("s")} AS kind, count(*) AS symbols ORDER BY symbols DESC`,
-    {},
-    read,
   );
-  const rows = (rs: typeof kinds) => rs.records.map((r) => Object.fromEntries(r.keys.map((k) => [k, plain(r.get(k))])));
-  return { project, languages: rows(languages), kinds: rows(kinds) };
+  return { project, languages: languages.rows, kinds: kinds.rows };
 }

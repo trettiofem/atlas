@@ -2,35 +2,24 @@
 
 **Warning**: this project is both very vibe-coded and untested, proceed with caution.
 
-MVP code graph: index TypeScript with [scip-typescript](https://github.com/sourcegraph/scip-typescript), load the SCIP index into Neo4j, and query it
+MVP code graph: index TypeScript with [scip-typescript](https://github.com/sourcegraph/scip-typescript), load the SCIP index into an embedded [RelateDB](https://relatedb.ai) store, and query it
 from an agent through an MCP server, or from the CLI.
 
 ```sh
-cp .env.example .env          # once; Neo4j settings for both the container and the CLI
-docker compose up -d --wait   # Neo4j: browser http://localhost:7474, bolt://localhost:7687
-pnpm graph sync               # scip-typescript index -> index.scip -> Neo4j (wipes and reloads the graph)
+pnpm graph sync               # scip-typescript index -> index.scip -> RelateDB in graph-db/ (wipes and reloads the graph)
 pnpm graph sync -p example-project   # same, for another project (every dir with a tsconfig.json is indexed)
 pnpm graph find buildGraph
 pnpm graph callers buildGraph 2
 pnpm test
 ```
 
-## Configuration
+## Storage
 
-`.env` (git-ignored; template in `.env.example`) is read by `docker-compose.yml` for the container and loaded by
-`src/main.ts` for the connection. Variables already set in the shell win over `.env`.
-
-| Variable | Used by |
-|---|---|
-| `NEO4J_PASSWORD` | container (`NEO4J_AUTH`, required) and CLI |
-| `NEO4J_USERNAME` | CLI |
-| `NEO4J_URI` | CLI, e.g. `neo4j://localhost:7687` |
-| `NEO4J_DATABASE` | reserved; the CLI uses the server's default database |
-| `NEO4J_IMAGE_TAG` | container image tag |
-
-The container publishes 7474 (Browser) and 7687 (Bolt) on 127.0.0.1 only. Neo4j only applies the password when
-it first creates its data volume, so after changing it run `docker compose down -v` (this deletes the graph) and
-`docker compose up -d --wait`.
+The graph is an embedded RelateDB store in `graph-db/` (git-ignored), opened in-process through `@relate/relate`.
+There is no server, container or configuration. `load` and `sync` open it for writing, and only one writer can
+run at a time. Queries and the MCP server open read-only snapshots, and the MCP server reopens its snapshot after
+a load. To explore the graph with Cypher, use the [`relate` CLI](https://relatedb.ai):
+`relate query -d graph-db "MATCH (s:Symbol:Method) RETURN count(s)"`.
 
 ## Graph model
 
@@ -65,7 +54,7 @@ scip-typescript doesn't, so for TS it's always null and the label is the only ty
 `language` comes from SCIP's `Document.language`, or from the file extension when that's empty, as it is with
 scip-typescript.
 
-Match `(s:Symbol:Method {name: ...})` rather than `(s:Method {...})` so Neo4j can use the `Symbol` indexes.
+Match `(s:Symbol:Method {name: ...})` rather than `(s:Method {...})` so the planner can use the `Symbol` indexes.
 
 | Edge | Meaning |
 |---|---|
@@ -114,6 +103,16 @@ grep, which workflows to follow, and the graph's blind spots. To run the server 
 `node_modules/.bin/tsx src/mcp.ts`. Don't use `pnpm mcp` as a client command, because pnpm's `$ tsx …` banner
 would corrupt the stdio stream.
 
+## Web UI
+
+`pnpm web` starts **Atlas**, a React UI at http://localhost:5180 (React, Tailwind, shadcn/ui). Home (the prompt
+box) and Agents are built, Agents with mock data from `web/mock.tsx`. Search and Code Graph are placeholders. The
+design language and tokens are in [AGENTS.md](AGENTS.md).
+
+It is one process. [src/web.ts](src/web.ts) serves a JSON API ([src/api.ts](src/api.ts), the same queries as the
+MCP server) and hands everything else to Vite, which serves the app in [web/](web/). It listens on 127.0.0.1 only
+and refuses API requests whose `Host` isn't loopback. Run `pnpm graph sync` first. Reload the page after a sync.
+
 ## Queries
 
 `pnpm graph <search|find|source|outline|refs|callers|callees|deps|dependents|tests-for|impact> <name-or-path> [depth]`,
@@ -123,7 +122,8 @@ plus `pnpm graph overview`. `--file <path>` narrows name-based queries, and `--k
 
 Other commands: `index [file]`, `load [file]`, `sync`. Run `pnpm graph` with no arguments for usage.
 
-Sources: `src/main.ts` (CLI entry point), `src/mcp.ts` (MCP server), `src/queries.ts` (Cypher queries shared by
+Sources: `src/main.ts` (CLI entry point), `src/mcp.ts` (MCP server), `src/web.ts` + `src/api.ts` (web UI server),
+`web/` (React UI), `src/queries.ts` (Cypher queries shared by
 both), `src/source.ts` (source slicing), `src/index.ts` (runs scip-typescript), `src/parse.ts`
-(SCIP -> graph), `src/load.ts` (graph -> Neo4j), `src/neo4j.ts` (connection), `src/types.ts` (SCIP and graph
-types), `src/languages.ts` (per-language rules), `schemas/graph.cypher` (Neo4j schema).
+(SCIP -> graph), `src/load.ts` (graph -> RelateDB), `src/db.ts` (store access), `src/types.ts` (SCIP and graph
+types), `src/languages.ts` (per-language rules), `schemas/graph.cypher` (graph schema).

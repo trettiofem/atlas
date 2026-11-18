@@ -5,7 +5,7 @@ description: Navigate the indexed project through its code graph (the code-graph
 
 # Code graph
 
-The `code-graph` MCP server answers symbol-level questions from a Neo4j graph built from a SCIP index of one
+The `code-graph` MCP server answers symbol-level questions from a RelateDB graph built from a SCIP index of one
 project: files, symbols (labelled `Type`, `Method`, `Term`, `Namespace`, `Parameter`…), and the edges between
 them (defines, references, uses, contains, imports, implements). Answers are exact rather than text matches,
 and they cost far less context than reading files.
@@ -16,8 +16,8 @@ Call `overview` first. It returns the project root, the indexer, when the graph 
 counts.
 
 - **"graph is not loaded", or the root isn't the project you're working on:** load it from the code-graph repo
-  (where `.mcp.json` lives) with `pnpm graph sync -p <project dir>`, then call `overview` again. Neo4j must be
-  running (`docker compose up -d --wait`).
+  (where `.mcp.json` lives) with `pnpm graph sync -p <project dir>`, then call `overview` again. The MCP
+  server picks up the new graph without a restart.
 - **You (or the user) have edited code since `loadedAt`:** results for the edited files may be stale. Re-run the
   sync if it matters for the task.
 

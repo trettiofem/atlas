@@ -1,14 +1,18 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Driver } from "neo4j-driver";
+import type { Connection, Database, ParamValue } from "@relate/relate";
 import { buildGraph, loadScipIndex } from "./parse.js";
 import { type Edge, type Graph, NODE_KINDS, type NodeKind, type SymbolNode } from "./types.js";
 
 const BATCH = 1000;
 
-async function writeBatches(driver: Driver, cypher: string, rows: unknown[]) {
+/** Relate refuses `undefined` parameters, so unset fields become null (rows are flat objects of primitives). */
+const nullify = (row: object): ParamValue =>
+  Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v ?? null]));
+
+async function writeBatches(conn: Connection, cypher: string, rows: object[]) {
   for (let i = 0; i < rows.length; i += BATCH) {
-    await driver.executeQuery(cypher, { rows: rows.slice(i, i + BATCH) });
+    await conn.queryAsync(cypher, { rows: rows.slice(i, i + BATCH).map(nullify) });
   }
 }
 
@@ -19,7 +23,7 @@ const edgeQuery = (fromLabel: string, key: string, toLabel: string, toKey: strin
    SET e.count = r.count`;
 
 /** Runs the statements in schemas/graph.cypher (constraints and indexes; `//` comment lines are ignored). */
-async function applySchema(driver: Driver) {
+async function applySchema(conn: Connection) {
   const text = readFileSync(fileURLToPath(new URL("../schemas/graph.cypher", import.meta.url)), "utf8");
   const statements = text
     .split("\n")
@@ -28,7 +32,7 @@ async function applySchema(driver: Driver) {
     .split(";")
     .map((s) => s.trim())
     .filter(Boolean);
-  for (const statement of statements) await driver.executeQuery(statement);
+  for (const statement of statements) await conn.queryAsync(statement);
 }
 
 function groupByKind(symbols: SymbolNode[]): Map<NodeKind | undefined, SymbolNode[]> {
@@ -41,21 +45,22 @@ function groupByKind(symbols: SymbolNode[]): Map<NodeKind | undefined, SymbolNod
   return groups;
 }
 
-export async function writeGraph(driver: Driver, g: Graph) {
-  await driver.executeQuery("MATCH (n) DETACH DELETE n");
-  await applySchema(driver);
+export async function writeGraph(db: Database, g: Graph) {
+  const conn = db.connect();
+  await conn.queryAsync("MATCH (n) DETACH DELETE n");
+  await applySchema(conn);
 
-  await driver.executeQuery(
+  await conn.queryAsync(
     "CREATE (:Project {root: $root, tool: $tool, toolVersion: $toolVersion, loadedAt: datetime()})",
     { root: g.project.root ?? null, tool: g.project.tool ?? null, toolVersion: g.project.toolVersion ?? null },
   );
 
-  await writeBatches(driver, "UNWIND $rows AS r CREATE (:File {path: r.path, language: r.language, isTest: r.isTest})", g.files);
+  await writeBatches(conn, "UNWIND $rows AS r CREATE (:File {path: r.path, language: r.language, isTest: r.isTest})", g.files);
   for (const [kind, rows] of groupByKind(g.symbols)) {
     // Labels can't be parameters; `kind` is interpolated only after checking it against NODE_KINDS.
     const label = kind && NODE_KINDS.includes(kind) ? `:Symbol:${kind}` : ":Symbol";
     await writeBatches(
-      driver,
+      conn,
       `UNWIND $rows AS r CREATE (s${label} {id: r.id, name: r.name, scipKind: r.scipKind, scheme: r.scheme,
                                            manager: r.manager, packageName: r.packageName, version: r.version,
                                            external: r.external, doc: r.doc, file: r.file, line: r.line,
@@ -64,7 +69,7 @@ export async function writeGraph(driver: Driver, g: Graph) {
     );
   }
 
-  const rel = (rows: Edge[], q: string) => writeBatches(driver, q, rows.map((e) => ({ count: 1, ...e })));
+  const rel = (rows: Edge[], q: string) => writeBatches(conn, q, rows.map((e) => ({ count: 1, ...e })));
   await rel(g.defines, edgeQuery("File", "path", "Symbol", "id", "DEFINES"));
   await rel(g.references, edgeQuery("File", "path", "Symbol", "id", "REFERENCES"));
   await rel(g.imports, edgeQuery("File", "path", "File", "path", "IMPORTS"));
@@ -72,11 +77,12 @@ export async function writeGraph(driver: Driver, g: Graph) {
   await rel(g.uses, edgeQuery("Symbol", "id", "Symbol", "id", "USES"));
   await rel(g.implements, edgeQuery("Symbol", "id", "Symbol", "id", "IMPLEMENTS"));
   await rel(g.typeOf, edgeQuery("Symbol", "id", "Symbol", "id", "TYPE_OF"));
+  db.checkpoint(); // compacts the WAL, which would otherwise grow with every reload
 }
 
-export async function loadGraph(driver: Driver, scipPath: string): Promise<string> {
+export async function loadGraph(db: Database, scipPath: string): Promise<string> {
   const graph = buildGraph(await loadScipIndex(scipPath));
-  await writeGraph(driver, graph);
+  await writeGraph(db, graph);
   const byKind = [...groupByKind(graph.symbols)]
     .map(([kind, rows]) => `${kind ?? "unknown"} ${rows.length}`)
     .join(", ");

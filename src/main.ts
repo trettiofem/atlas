@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { DEFAULT_INDEX, index } from "./index.js";
 import { loadGraph } from "./load.js";
-import { withDriver } from "./neo4j.js";
+import { openWriter, reader } from "./db.js";
 import { isQueryCommand, overview, QUERY_USAGE, runQuery } from "./queries.js";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -21,15 +21,15 @@ async function main() {
     case "index":
       return index(values.project, arg);
     case "load":
-      return console.log(await withDriver((d) => loadGraph(d, arg ?? DEFAULT_INDEX)));
+      return console.log(await loadGraph(openWriter(), arg ?? DEFAULT_INDEX));
     case "sync":
       index(values.project);
-      return console.log(await withDriver((d) => loadGraph(d, DEFAULT_INDEX)));
+      return console.log(await loadGraph(openWriter(), DEFAULT_INDEX));
     case "overview":
-      return console.dir(await withDriver(overview), { depth: null });
+      return console.dir(await overview(reader()), { depth: null });
   }
   if (isQueryCommand(cmd) && arg) {
-    const rows = await withDriver((d) => runQuery(d, cmd, arg, { depth, file: values.file, kind: values.kind }));
+    const rows = await runQuery(reader(), cmd, arg, { depth, file: values.file, kind: values.kind });
     return rows.length ? console.table(rows) : console.log("(no results)");
   }
   console.error(USAGE);
@@ -39,7 +39,7 @@ async function main() {
 const USAGE = `Usage: pnpm graph <command> [args]
 
   index [file]   run scip-typescript, writing index.scip
-  load [file]    load a SCIP index into Neo4j (replaces the existing graph)
+  load [file]    load a SCIP index into RelateDB (replaces the existing graph)
   sync           index + load
 
 Options:

@@ -1,10 +1,10 @@
-import { readFile } from "node:fs/promises";
+import type { Connection } from "@relate/relate";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { connect } from "./neo4j.js";
+import { NOT_LOADED, reader } from "./db.js";
 import { getProject, overview, type QueryOptions, type Row, runQuery } from "./queries.js";
-import { resolveInRoot, sliceLines, toProjectRelative } from "./source.js";
+import { readDefinitions, resolveInRoot, toProjectRelative } from "./source.js";
 import { NODE_KINDS } from "./types.js";
 
 // stdout carries the JSON-RPC stream, so anything human-readable goes to stderr.
@@ -13,15 +13,12 @@ const log = (...args: unknown[]) => console.error("[code-graph]", ...args);
 const MAX_ROWS = 200;
 const MAX_SOURCE_MATCHES = 3;
 
-const INSTRUCTIONS = `Code graph of one indexed project, built from a SCIP index and stored in Neo4j.
+const INSTRUCTIONS = `Code graph of one indexed project, built from a SCIP index and stored in RelateDB.
 Start with \`overview\` to see which project is loaded and how big it is. Use \`search_symbols\` when you don't
 know a symbol's exact name, then \`get_source\` to read it instead of opening whole files. Names are not unique:
 when a name matches several symbols, pass \`file\` to pick one. Results carry \`file\` (project-relative) and
 \`path\` (absolute). The graph is a snapshot: it doesn't see edits made since the last \`pnpm graph sync\`.`;
 
-const NOT_LOADED = "The graph is not loaded. Run `pnpm graph sync -p <project dir>` in the code-graph repo first.";
-
-const driver = connect();
 const server = new McpServer({ name: "code-graph", version: "0.1.0" }, { instructions: INSTRUCTIONS });
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
@@ -30,11 +27,12 @@ const ok = (data: unknown): ToolResult => ({ content: [{ type: "text", text: JSO
 const fail = (message: string): ToolResult => ({ content: [{ type: "text", text: message }], isError: true });
 
 /** Runs `fn` with the loaded project's root, turning a missing graph or a database error into a tool error. */
-async function withRoot(fn: (root: string) => Promise<ToolResult>): Promise<ToolResult> {
+async function withRoot(fn: (root: string, conn: Connection) => Promise<ToolResult>): Promise<ToolResult> {
   try {
-    const project = await getProject(driver);
+    const conn = reader();
+    const project = await getProject(conn);
     if (!project?.root) return fail(NOT_LOADED);
-    return await fn(project.root);
+    return await fn(project.root, conn);
   } catch (e) {
     log(e);
     return fail(`Graph query failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -49,10 +47,10 @@ const withPaths = (root: string, rows: Row[]) =>
   });
 
 function queryTool(cmd: string, arg: string, opts: QueryOptions = {}) {
-  return withRoot(async (root) => {
+  return withRoot(async (root, conn) => {
     const file = opts.file && toProjectRelative(root, opts.file);
     const target = cmd === "outline" || cmd === "deps" || cmd === "dependents" ? toProjectRelative(root, arg) : arg;
-    const rows = await runQuery(driver, cmd, target, { ...opts, file });
+    const rows = await runQuery(conn, cmd, target, { ...opts, file });
     if (rows.length === 0) {
       return ok({ results: [], hint: `No results for "${arg}". Names are exact; try search_symbols for partial names.` });
     }
@@ -76,7 +74,7 @@ server.registerTool(
     description: "Which project is loaded (root, indexer, load time), file counts per language, symbol counts per kind.",
     annotations: readOnly,
   },
-  async () => withRoot(async () => ok(await overview(driver))),
+  async () => withRoot(async (_, conn) => ok(await overview(conn))),
 );
 
 server.registerTool(
@@ -115,20 +113,10 @@ server.registerTool(
     annotations: readOnly,
   },
   async (args) =>
-    withRoot(async (root) => {
-      const rows = await runQuery(driver, "source", args.name, { file: args.file && toProjectRelative(root, args.file) });
+    withRoot(async (root, conn) => {
+      const rows = await runQuery(conn, "source", args.name, { file: args.file && toProjectRelative(root, args.file) });
       if (rows.length === 0) return ok({ results: [], hint: `No symbol named "${args.name}"; try search_symbols.` });
-      const results = [];
-      for (const row of rows.slice(0, MAX_SOURCE_MATCHES)) {
-        const path = resolveInRoot(root, String(row.file));
-        const text = await readFile(path, "utf8").catch(() => undefined);
-        if (text === undefined) {
-          results.push({ ...row, path, error: "file not readable; the graph may be stale" });
-          continue;
-        }
-        const slice = sliceLines(text, Number(row.line), typeof row.endLine === "number" ? row.endLine : undefined);
-        results.push({ kind: row.kind, name: row.name, file: row.file, path, ...slice });
-      }
+      const results = await readDefinitions(root, rows.slice(0, MAX_SOURCE_MATCHES));
       const more = rows.length - results.length;
       return ok(more > 0 ? { results, truncated: `${more} more matches; pass file to pick one` } : { results });
     }),
@@ -216,10 +204,7 @@ server.registerTool(
   async (args) => queryTool("impact", args.name, { file: args.file }),
 );
 
-async function shutdown() {
-  await driver.close().catch(() => {});
-  process.exit(0);
-}
+const shutdown = () => process.exit(0);
 process.stdin.on("close", shutdown);
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
