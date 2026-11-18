@@ -41,7 +41,7 @@ const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
  *   GET  /api/graph/node?id=<id> | ?name=&file=&line=     a node and its edge counts per type and direction
  *   GET  /api/graph/neighbors?id=<id>[&type=<EDGE>&dir=in|out&limit=<n>]
  *   POST /api/graph/edges {ids: [...]}                    every edge between these nodes
- *   GET  /api/graph/path?from=<id>&to=<id>[&types=USES,CONTAINS&directed=1]   a shortest path, or 404
+ *   GET  /api/graph/path?from=<id>&to=<id>[&types=USES,CONTAINS&directed=1]   a shortest path; no nodes if none
  */
 export async function handleApi(req: IncomingMessage, res: ServerResponse) {
   const send = (status: number, body: unknown) =>
@@ -116,7 +116,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse) {
         const types = p.types?.split(",");
         if (types && !types.every(isEdgeType)) return send(400, { error: "Unknown edge type in `types`" });
         const path = await findPath(reader(), p.from, p.to, { types, directed: p.directed === "1" });
-        return path ? send(200, path) : send(404, { error: "No path" });
+        return send(200, path ?? { nodes: [], edges: [] });
       }
     }
     send(404, { error: "Not found" });

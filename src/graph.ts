@@ -20,6 +20,7 @@ export interface GraphNode {
   /** Defining file; null for external symbols. */
   file: string | null;
   line: number | null;
+  endLine: number | null;
   external: boolean;
   isTest: boolean;
   /** Package of an external symbol, e.g. "react". */
@@ -47,10 +48,10 @@ const shown = (v: string) => `(${v}:File OR (${v}:Symbol AND NOT ${v}:Parameter 
 
 const node = (v: string) =>
   `CASE WHEN ${v}:File
-     THEN {id: 'file:' + ${v}.path, kind: 'File', name: ${v}.path, file: ${v}.path, line: null, external: false,
+     THEN {id: 'file:' + ${v}.path, kind: 'File', name: ${v}.path, file: ${v}.path, line: null, endLine: null, external: false,
            isTest: ${v}.isTest, package: null, degree: COUNT { (${v})--(x) WHERE ${shown("x")} }}
      ELSE {id: 'sym:' + ${v}.id, kind: [l IN labels(${v}) WHERE l <> 'Symbol'][0], name: ${v}.name, file: ${v}.file,
-           line: ${v}.line, external: ${v}.external, isTest: false, package: ${v}.packageName,
+           line: ${v}.line, endLine: ${v}.endLine, external: ${v}.external, isTest: false, package: ${v}.packageName,
            degree: COUNT { (${v})--(x) WHERE ${shown("x")} }}
    END`;
 
@@ -224,21 +225,18 @@ export async function bidirectionalSearch<Id>(
   return undefined;
 }
 
-function joinPath<Id>(
-  meet: Id,
-  fromSeen: Map<Id, { prev?: Id; type?: EdgeType; out?: boolean }>,
-  toSeen: Map<Id, { prev?: Id; type?: EdgeType; out?: boolean }>,
-): PathStep<Id>[] {
+type Visit<Id> = { prev?: Id; type?: EdgeType; out?: boolean };
+
+function joinPath<Id>(meet: Id, fromSeen: Map<Id, Visit<Id>>, toSeen: Map<Id, Visit<Id>>): PathStep<Id>[] {
   // Walk back to `from`: each visit holds the edge from its predecessor, `out` meaning predecessor -> node.
-  const head: PathStep<Id>[] = [];
+  const path: PathStep<Id>[] = [];
   for (let id: Id | undefined = meet; id !== undefined; ) {
-    const v = fromSeen.get(id)!;
-    head.unshift({ node: id, edge: v.type ? { type: v.type, forward: !!v.out } : undefined });
+    const v: Visit<Id> = fromSeen.get(id)!;
+    path.unshift({ node: id, edge: v.type ? { type: v.type, forward: !!v.out } : undefined });
     id = v.prev;
   }
   // Walk on to `to`: there `prev` is the next node along the path, and `out` means next -> node, i.e. backward.
-  const path = head;
-  for (let id: Id = meet, v = toSeen.get(meet)!; v.prev !== undefined; id = v.prev, v = toSeen.get(id)!) {
+  for (let v: Visit<Id> = toSeen.get(meet)!; v.prev !== undefined; v = toSeen.get(v.prev)!) {
     path.push({ node: v.prev, edge: { type: v.type!, forward: !v.out } });
   }
   return path;
