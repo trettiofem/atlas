@@ -89,7 +89,7 @@ function TurnView({ turn, onOpenFile }: { turn: Turn; onOpenFile: (file: FileRef
       return (
         <div className="space-y-1">
           {/* A fresh object per click, so reopening the same reference scrolls back to its lines. */}
-          <Button variant="ghost" size="sm" className="-mx-2.5 max-w-full font-mono font-normal" onClick={() => onOpenFile({ path, lines })}>
+          <Button variant="ghost" size="sm" className="-mx-2.5 max-w-full font-mono text-xs font-normal" onClick={() => onOpenFile({ path, lines })}>
             <File className="text-muted-foreground" />
             <span className="truncate">
               {path}

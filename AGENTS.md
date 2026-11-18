@@ -145,7 +145,7 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
    - User messages: right-aligned raised bubbles (`UserMessage` in `chat.tsx`).
    - Agent steps: muted rows with an icon, the step and its duration, such as "Queried code graph · 52ms" (`Waypoints`) and "Thought · 2s" (`CircleCheck`). A running step has no duration and a spinning `LoaderCircle`.
    - Answer: body text with inline `<code>` (Geist Mono, no background) and bullet lists.
-   - File references (`FileRef`: a path plus optional `lines`): a ghost button with a `File` icon, the mono path and a `ChevronRight`. Clicking one opens the source panel.
+   - File references (`FileRef`: a path plus optional `lines`): a ghost button with a `File` icon, the mono path (`text-xs`, so it matches the body text visually) and a `ChevronRight`. Clicking one opens the source panel.
    - When the agent highlights lines, the reference reads `path:19-22` and a bordered snippet of exactly those lines sits under it.
    - The prompt box is pinned to the bottom, with a top border.
 3. **Source panel** (`min(30rem, 40%)`, covers the conversation on mobile):
