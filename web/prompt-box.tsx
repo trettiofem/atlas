@@ -1,4 +1,4 @@
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowUp, Plus } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +52,7 @@ export function PromptBox({
             <Plus />
           </InputGroupButton>
           <InputGroupButton type="submit" variant="primary" size="icon-sm" className="shadow-raised-primary" aria-label="Send" disabled={blocked}>
-            <ArrowRight />
+            <ArrowUp />
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
