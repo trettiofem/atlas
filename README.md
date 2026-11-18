@@ -109,7 +109,8 @@ would corrupt the stdio stream.
 - **Search** runs on the loaded graph. Find a symbol, then read its source and browse its callers, callees,
   references, tests and impact.
 - **Home** (the prompt box) and **Agents** are built, with mock data from `web/mock.tsx`.
-- **Code Graph** is a placeholder.
+- **Code Graph** draws the loaded graph with [Cytoscape.js](https://js.cytoscape.org). Start from a symbol or file,
+  expand and collapse nodes to follow their edges, and find the shortest path between two nodes.
 
 The design language and tokens are in [AGENTS.md](AGENTS.md).
 
@@ -123,6 +124,16 @@ and refuses API requests whose `Host` isn't loopback. Run `pnpm graph sync` firs
 | `GET /api/query?cmd=<query>&arg=<name or path>` | the rows of a [query](#queries); optional `file`, `line`, `kind`, `depth` |
 | `GET /api/source?name=<symbol>` | definition source, like the MCP `get_source` tool; optional `file` |
 | `GET /api/file?path=<file>` | `{ file, text }`; only files in the graph (404 otherwise), at most 1 MB |
+| `GET /api/graph/search?q=<text>` | files whose path, then symbols whose name, contains the text, as graph nodes |
+| `GET /api/graph/node?id=<id>` | a node and its edge counts per type and direction; or `?name=&file=&line=` for a symbol |
+| `GET /api/graph/neighbors?id=<id>` | a node's neighbors and the edges to them; optional `type`, `dir` (`in`/`out`), `limit` per group |
+| `POST /api/graph/edges` | `{ ids }` in, every edge between those nodes out |
+| `GET /api/graph/path?from=<id>&to=<id>` | a shortest path (`nodes`, `edges`; empty if none); optional `types` (comma-separated) and `directed=1` |
+
+Graph node ids are `file:<path>` or `sym:<SCIP symbol>`, stable across syncs. Paths come from a bidirectional
+breadth-first search in [src/graph.ts](src/graph.ts), one Cypher query per hop, rather than Cypher's
+`shortestPath`: with a path filter, RelateDB enumerates paths, and a query with no path ran for minutes. They skip
+parameters and never pass through external symbols.
 
 `line` narrows name-based queries to the symbol defined on that line, for same-name symbols in one file.
 
@@ -137,6 +148,6 @@ Other commands: `index [file]`, `load [file]`, `sync`. Run `pnpm graph` with no 
 
 Sources: `src/main.ts` (CLI entry point), `src/mcp.ts` (MCP server), `src/web.ts` + `src/api.ts` (web UI server),
 `web/` (React UI), `src/queries.ts` (Cypher queries shared by
-all three), `src/source.ts` (source slicing), `src/index.ts` (runs scip-typescript), `src/parse.ts`
+all three), `src/graph.ts` (the Code Graph page's queries and path search), `src/source.ts` (source slicing), `src/index.ts` (runs scip-typescript), `src/parse.ts`
 (SCIP -> graph), `src/load.ts` (graph -> RelateDB), `src/db.ts` (store access), `src/types.ts` (SCIP and graph
 types), `src/languages.ts` (per-language rules), `schemas/graph.cypher` (graph schema).

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Agents, findAgent } from "@/agents";
 import { AppSidebar, NAV } from "@/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Graph } from "@/graph";
 import { Home } from "@/home";
 import { Search } from "@/search";
 
@@ -21,7 +22,8 @@ function App() {
   const page = NAV.find((n) => n.path === path);
   const params = new URLSearchParams(query);
   // "_minColorDistance · Symbols · Atlas", "Investigation into billing logic · Agents · Atlas", or just "Atlas" on Home.
-  const subject = path === "/search" ? params.get("name") : path === "/agents" ? findAgent(id)?.title : undefined;
+  const subject =
+    path === "/search" || path === "/graph" ? params.get("name") : path === "/agents" ? findAgent(id)?.title : undefined;
   const title = [subject, path === "/" ? undefined : (page?.title ?? "Not found"), "Atlas"].filter(Boolean).join(" · ");
   useEffect(() => {
     document.title = title;
@@ -39,6 +41,8 @@ function App() {
           <Search params={params} />
         ) : path === "/agents" ? (
           <Agents id={id} />
+        ) : path === "/graph" ? (
+          <Graph params={params} />
         ) : (
           <p className="m-auto text-muted-foreground">{page ? `${page.title} is coming soon.` : "Page not found."}</p>
         )}

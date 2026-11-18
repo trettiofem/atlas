@@ -24,7 +24,7 @@ export function Agents({ id }: { id?: string }) {
   const agents = fuzzyFilter(AGENTS, q, (a) => [a.title, a.description, a.creator.name]);
   return (
     <div className="relative flex min-h-0 flex-1">
-      <div className="hidden w-62.5 shrink-0 flex-col border-r md:flex">
+      <div className="hidden w-80 shrink-0 flex-col border-r md:flex">
         <div role="search" className="border-b p-4">
           <InputGroup>
             <InputGroupAddon>
