@@ -20,7 +20,8 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
   - [web/symbol.tsx](web/symbol.tsx): `SymbolIcon`, kind labels, `PathLabel` and `searchHref`.
   - [web/chat.tsx](web/chat.tsx): `UserMessage` (the raised bubble) and `Step` (an icon, a label and a duration, or a spinner while running), shared by Agents and the Explain chat.
   - [web/explain.tsx](web/explain.tsx): the Explain tip and the Explain chat dialog (`components/ui/dialog.tsx`).
-- **Backend**: Search is live. [web/api.ts](web/api.ts) has the row types and `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests. A 503 means no graph is loaded.
+ - [web/tunnel.tsx](web/tunnel.tsx): `Tunnel`, the generated SVG wireframe tunnel behind Home.
+- **Backend**: Search and Home's project row are live. [web/api.ts](web/api.ts) has the row types and `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests. A 503 means no graph is loaded.
 - **Mock data**: agents, transcripts and their source are in [web/mock.tsx](web/mock.tsx), and so are the agents in the sidebar's "Latest" list. Sending a prompt does nothing yet, and the Explain chat never answers.
 - **Recent symbols**: [web/recent.ts](web/recent.ts) keeps the last 5 symbols opened in Search in localStorage, for "Latest".
 
@@ -88,9 +89,12 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 
 A centered column 512px wide (`max-w-lg`), vertically centered, containing, from top to bottom:
 - `LogoLarge.svg` followed by "What’s up?"
+- The project row, so users know which code base they're asking about: `FolderCode`, the root's folder name in mono `font-medium` (the full path in its tooltip), and on the right muted "92 files · 16 tests · 736 symbols" from `/api/overview`. `overviewCounts` in `api.ts` does the counting, so these numbers match Search's hint. The row has a fixed height so the prompt doesn't move when the overview loads. With no graph it reads "No project loaded."
 - The prompt box: an auto-growing textarea with the placeholder "Ask me anything about the code base…", a `+` (add context) button bottom-left and an `ArrowRight` send button bottom-right. Enter sends and Shift+Enter adds a new line.
-- A row of outline suggestion chips ("Explain a module", "Find dead code", "Find callers") that fill the prompt.
+- A row of outline suggestion chips ("Explain a module", "Find dead code", "Find callers"). Each fills the prompt with a fuller request that says what to cover and how to list results. A `[bracketed]` blank such as `[function name]` is selected when the chip fills the prompt, so typing replaces it. Prompts without a blank put the cursor at the end.
 - The tagline "Atlas -- Intelligent Code Analysis Platform" in mono `text-xs`.
+
+Behind the column is a 3D wireframe tunnel (`Tunnel`): 1px neutral-67 lines on the flat background, in one-point perspective, with the vanishing point at the prompt box's center. It's an SVG generated from the page size, re-measured on resize. Its empty end wall (640×480 by default) frames the column, so no lines cross the text. Props set the end size, the line counts (`columns`, `rows`) and the camera `depth`. Floor cells are square in 3D, so the cross-lines bunch up toward the end.
 
 ### Search page
 

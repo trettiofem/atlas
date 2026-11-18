@@ -7,6 +7,7 @@ import {
   fileUrl,
   type ImpactFile,
   type Overview,
+  overviewCounts,
   queryUrl,
   type RefFile,
   type Related,
@@ -131,9 +132,7 @@ function Results({ state, overview }: { state: SearchState; overview?: Overview 
   const results = q ? (search.data ?? (search.loading ? search.latest : undefined)) : undefined;
 
   const kinds = Object.keys(KIND_FILTERS).filter((k) => overview?.kinds.some((row) => row.kind === k));
-  const symbolCount = overview?.kinds.reduce((n, row) => (row.kind === "Parameter" || row.kind === "TypeParameter" ? n : n + row.symbols), 0);
-  const fileCount = overview?.languages.reduce((n, row) => n + row.files, 0);
-
+  const counts = overview && overviewCounts(overview);
   return (
     <section aria-label="Search" className={cn("flex w-full flex-col md:w-80 md:shrink-0 md:border-r", symbol && "hidden md:flex")}>
       <form
@@ -181,9 +180,9 @@ function Results({ state, overview }: { state: SearchState; overview?: Overview 
       </form>
       <nav aria-label="Results" className="flex-1 overflow-y-auto">
         {!q ? (
-          overview && (
+          counts && (
             <Hint>
-              Search {symbolCount} symbols across {fileCount} files.
+              Search {counts.symbols} symbols across {counts.files} files.
             </Hint>
           )
         ) : search.error ? (

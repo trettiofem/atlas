@@ -33,6 +33,15 @@ export interface Overview {
   kinds: { kind: string | null; symbols: number }[];
 }
 
+/** Totals for hints: parameters aren't counted as symbols, since search skips them. */
+export function overviewCounts({ languages, kinds }: Overview) {
+  return {
+    files: languages.reduce((n, row) => n + row.files, 0),
+    testFiles: languages.reduce((n, row) => n + row.testFiles, 0),
+    symbols: kinds.reduce((n, row) => (row.kind === "Parameter" || row.kind === "TypeParameter" ? n : n + row.symbols), 0),
+  };
+}
+
 export interface FileText {
   file: string;
   text: string;
