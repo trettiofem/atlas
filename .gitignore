@@ -3,3 +3,4 @@ example-project/
 index.scip
 .env
 graph-db/
+.pnpm-store/
