@@ -10,7 +10,8 @@
   --color-neutral-33: #44403b; /* icons, muted text */
   --color-neutral-67: #d6d3d1; /* borders */
   --color-neutral-100: #fafaf9; /* background */
-  --color-blue: #2176cc; /* logo, ready agents */
+  --color-blue: #2176cc; /* logo, ready agents, primary buttons */
+  --color-dark-blue: #19599a; /* primary button border */
   --color-salmon: #ff7d6e; /* working agents */
 
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
@@ -19,6 +20,7 @@
   /* The raised lip: with `border-2` the bottom reads 4px. A shadow, not border-bottom, so a pressed
      button (`active:translate-y-0.5 active:shadow-none`) sinks without changing layout. */
   --shadow-raised: 0 2px 0 0 var(--color-neutral-67);
+  --shadow-raised-primary: 0 2px 0 0 var(--color-dark-blue);
 
   /* Home's entrance. `backwards`, not `both`: the end state must not pin `transform` or `filter`
      afterwards, or it would fight the pressed buttons' `translate`. */
@@ -48,13 +50,13 @@
   --destructive: var(--color-salmon);
   --border: var(--color-neutral-67);
   --input: var(--color-neutral-67);
-  --ring: var(--color-neutral-33);
+  --ring: var(--color-blue);
   --sidebar: var(--color-neutral-100);
   --sidebar-foreground: var(--color-neutral-0);
   --sidebar-accent: var(--accent);
   --sidebar-accent-foreground: var(--color-neutral-0);
   --sidebar-border: var(--color-neutral-67);
-  --sidebar-ring: var(--color-neutral-33);
+  --sidebar-ring: var(--color-blue);
 }
 
 @theme inline {

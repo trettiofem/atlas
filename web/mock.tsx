@@ -18,6 +18,8 @@ export interface Agent {
   transcript: Turn[];
 }
 
+export const USER = { name: "Emil Eifrém", org: "Neo4j" };
+
 export const AGENTS: Agent[] = [
   {
     id: "billing",

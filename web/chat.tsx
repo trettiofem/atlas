@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 /** A user's message: a right-aligned raised bubble. */
 export function UserMessage({ children }: { children: ReactNode }) {
-  return <p className="ml-auto w-fit max-w-[80%] rounded-md border px-2.5 py-1.5 whitespace-pre-wrap shadow-raised">{children}</p>;
+  return <p className="ml-auto w-fit max-w-[80%] rounded-md border-2 px-2.5 py-1.5 whitespace-pre-wrap shadow-raised">{children}</p>;
 }
 
 /** A tool call or thinking step, e.g. "Queried code graph · 52ms". Without a `duration` it is still running. */

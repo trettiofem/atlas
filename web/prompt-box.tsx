@@ -46,7 +46,7 @@ export function PromptBox({
           <InputGroupButton variant="outline" size="icon-sm" className="shadow-raised" aria-label="Add context">
             <Plus />
           </InputGroupButton>
-          <InputGroupButton type="submit" variant="outline" size="icon-sm" className="shadow-raised" aria-label="Send" disabled={empty}>
+          <InputGroupButton type="submit" variant="primary" size="icon-sm" className="shadow-raised-primary" aria-label="Send" disabled={empty}>
             <ArrowRight />
           </InputGroupButton>
         </InputGroupAddon>

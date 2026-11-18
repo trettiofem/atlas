@@ -1,7 +1,7 @@
 import "./style.css";
-import { type CSSProperties, StrictMode, useSyncExternalStore } from "react";
+import { type CSSProperties, StrictMode, useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
-import { Agents } from "@/agents";
+import { Agents, findAgent } from "@/agents";
 import { AppSidebar, NAV } from "@/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Home } from "@/home";
@@ -19,6 +19,13 @@ function App() {
   const [, section = "", id] = route.split("/");
   const path = `/${section}`;
   const page = NAV.find((n) => n.path === path);
+  const params = new URLSearchParams(query);
+  // "_minColorDistance · Search · Atlas", "Investigation into billing logic · Agents · Atlas", or just "Atlas" on Home.
+  const subject = path === "/search" ? params.get("name") : path === "/agents" ? findAgent(id)?.title : undefined;
+  const title = [subject, path === "/" ? undefined : (page?.title ?? "Not found"), "Atlas"].filter(Boolean).join(" · ");
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
   return (
     <SidebarProvider style={{ "--sidebar-width": "12.5rem" } as CSSProperties}>
       <AppSidebar route={path} />
@@ -29,7 +36,7 @@ function App() {
         {path === "/" ? (
           <Home />
         ) : path === "/search" ? (
-          <Search params={new URLSearchParams(query)} />
+          <Search params={params} />
         ) : path === "/agents" ? (
           <Agents id={id} />
         ) : (

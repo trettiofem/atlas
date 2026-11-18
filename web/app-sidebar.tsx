@@ -2,6 +2,7 @@ import { Bot, House, type LucideIcon, Search, Waypoints } from "lucide-react";
 import { AgentIcon } from "@/agent-icon";
 import logo from "@/assets/Logo.svg";
 import wordmark from "@/assets/LogoWordmark.svg";
+import avatar from "@/assets/UserLarge.svg";
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +15,7 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { AGENTS } from "@/mock";
+import { AGENTS, USER } from "@/mock";
 import { useRecentSymbols } from "@/recent";
 import { SymbolIcon, searchHref } from "@/symbol";
 
@@ -79,8 +80,15 @@ export function AppSidebar({ route }: { route: string }) {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="hidden items-center group-data-[collapsible=icon]:flex">
-        <SidebarTrigger className="text-muted-foreground" />
+      <SidebarFooter className="gap-4 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+        <div className="flex items-center gap-2" title={`${USER.name} · ${USER.org}`}>
+          <img src={avatar} alt="" width={24} height={24} className="shrink-0" />
+          <div className="min-w-0 group-data-[collapsible=icon]:sr-only">
+            <div className="truncate font-medium">{USER.name}</div>
+            <div className="truncate text-muted-foreground">{USER.org}</div>
+          </div>
+        </div>
+        <SidebarTrigger className="hidden text-muted-foreground group-data-[collapsible=icon]:flex" />
       </SidebarFooter>
     </Sidebar>
   );

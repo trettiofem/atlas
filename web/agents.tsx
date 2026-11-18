@@ -9,9 +9,12 @@ import { CodeLines, type FileRef, SourcePanel } from "@/source";
 
 const STEP_ICON = { graph: Waypoints, thought: CircleCheck };
 
-/** Agent list, conversation and source panel. `id` comes from #/agents/<id>; without one the first agent opens. */
+/** `id` comes from #/agents/<id>; without one the first agent opens. */
+export const findAgent = (id?: string) => (id ? AGENTS.find((a) => a.id === id) : AGENTS[0]);
+
+/** Agent list, conversation and source panel. */
 export function Agents({ id }: { id?: string }) {
-  const agent = id ? AGENTS.find((a) => a.id === id) : AGENTS[0];
+  const agent = findAgent(id);
   return (
     <div className="relative flex min-h-0 flex-1">
       <nav aria-label="Agents" className="hidden w-62.5 shrink-0 overflow-y-auto border-r md:block">
@@ -33,7 +36,7 @@ export function Agents({ id }: { id?: string }) {
         ))}
         <div className="border-b p-4">
           {/* New agents start from a prompt on Home. */}
-          <Button variant="outline" className="w-full" asChild>
+          <Button variant="primary" className="w-full" asChild>
             <a href="#/">
               <Plus /> Create
             </a>

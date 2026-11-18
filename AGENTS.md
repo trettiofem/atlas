@@ -10,7 +10,7 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - [src/web.ts](src/web.ts) is the Vite config. It is inline with `configFile: false` and sets the Tailwind plugin and the `@` → `web/` alias. There is no `vite.config.ts`.
 - shadcn components are in `web/components/ui/` and `cn` is in `web/lib/utils.ts`. These files are ours to edit. The shadcn CLI doesn't run in this layout (no `package.json` in `web/`). To add a component, fetch `https://ui.shadcn.com/r/styles/new-york-v4/<name>.json`, write its `files[].content`, rewrite `@/registry/new-york-v4/ui/` → `@/components/ui/` and `"cn"` → `"@/lib/utils"`, and add its npm `dependencies` at the repo root.
 - Theme tokens are in [web/style.css](web/style.css).
-- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/graph`.
+- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/graph`. It also sets the document title from the route: the open symbol or agent, then the page, then "Atlas" (`_minColorDistance · Search · Atlas`). Home is just "Atlas".
 - Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx) and [web/agents.tsx](web/agents.tsx). Code Graph is a placeholder.
 - Shared components:
   - [web/app-sidebar.tsx](web/app-sidebar.tsx).
@@ -32,10 +32,11 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
 | Token | Hex | Role | shadcn alias |
 |---|---|---|---|
 | `neutral-0` | `#0C0A09` | Text | `foreground`, `primary` |
-| `neutral-33` | `#44403B` | Icons, muted text | `muted-foreground`, `ring` |
+| `neutral-33` | `#44403B` | Icons, muted text | `muted-foreground` |
 | `neutral-67` | `#D6D3D1` | Borders, dividers | `border`, `input` |
 | `neutral-100` | `#FAFAF9` | Background (app, sidebar, cards, inputs) | `background`, `sidebar` |
-| `blue` | `#2176CC` | Logo, **ready** agents | none |
+| `blue` | `#2176CC` | Logo, **ready** agents, primary button fill, focus | `ring` |
+| `dark-blue` | `#19599A` | Primary button border and lip | none |
 | `salmon` | `#FF7D6E` | **Working** agents | `destructive` (placeholder) |
 
 - **Hover / active fill**: `accent` is neutral-67 mixed 40% into neutral-100. It is the only derived color.
@@ -55,10 +56,11 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
   - The `outline` button variant, `InputGroup`, `Input`, `Textarea` and `DialogContent` already include it. Inside `InputGroupButton`, add `className="shadow-raised"` because that component forces `shadow-none`.
   - **Pressed**: raised buttons sink when clicked (`active:translate-y-0.5 active:shadow-none`, already in the `outline` variant). The face drops 2px onto the lip, faking a 3D key.
   - **Toggled**: an `outline` button with `aria-pressed` set to true stays sunk and gets the `accent` fill, like a latched key. Search's kind chips use it. It's in the variant already, so just set `aria-pressed`.
+  - **Primary**: the `primary` button variant is raised the same way, with a `blue` fill, `neutral-100` text, and a `dark-blue` border and lip (`shadow-raised-primary`). It sinks when pressed like `outline`. Inside `InputGroupButton`, add `className="shadow-raised-primary"`. Use it for the one main action in a view. Don't confuse it with shadcn's `primary` token, which is `neutral-0` and drives the `default` variant.
   - The lip is a shadow, not `border-b-4`. shadcn buttons have fixed heights, so thinning a real bottom border on press would push the bottom edge down instead of sinking the face.
   - Ghost buttons (sidebar trigger, close `X`, file references) and non-interactive surfaces stay flat.
 - **Radius**: `--radius` is 0.5rem. Buttons and chips are `rounded-md` (6px). The prompt box and large containers are `rounded-xl` (12px).
-- **Focus**: the prompt box shows focus with a darker border (`border-ring`), not a halo. Other controls keep shadcn's ring.
+- **Focus**: `ring` is `blue`. The prompt box shows focus with a blue border (`border-ring`), not a halo. Other controls keep shadcn's ring: a blue border plus a translucent blue halo.
 - **Icons**: Lucide at 16px (`size-4`) in neutral-33. Icon-only buttons are 32px square (`size="icon-sm"`) and need an `aria-label`.
 - **Tabs** (`web/components/ui/tabs.tsx`): triggers are raised `outline` buttons (`size="sm"`), and the active one stays sunk with the `accent` fill, like a toggled chip. There's no track. A tab bar has `p-4` and a bottom border, like the search block on Search.
 
@@ -78,7 +80,8 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
   - Header: `LogoWordmark.svg` on the left and the collapse trigger on the right.
   - Nav: Home (`House`), Search (`Search`), Agents (`Bot`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
   - "Latest": the symbols and agents the user last touched. Symbols (the last 5 opened in Search) come first, with their `SymbolIcon` and mono text, and link back to Search. Agents show `AgentIcon` and sans text. All entries truncate with an ellipsis.
-- **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Latest" hidden, and the trigger at the bottom.
+  - Footer: the user, with the 24px `UserLarge.svg` avatar, the name in `font-medium` and the muted org underneath. It's mock data (`USER` in `mock.tsx`) and does nothing yet.
+- **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Latest" hidden, and at the bottom the avatar above the trigger.
 - What the nav items do:
   - Home: start a chat. Sending a prompt creates an agent and opens the Agents page.
   - Search: find symbols.
@@ -90,7 +93,7 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 A centered column 512px wide (`max-w-lg`), vertically centered, containing, from top to bottom:
 - `LogoLarge.svg` followed by "What’s up?"
 - The project row, so users know which code base they're asking about: `FolderCode`, the root's folder name in mono `font-medium` (the full path in its tooltip), and on the right muted "92 files · 16 tests · 736 symbols" from `/api/overview`. `overviewCounts` in `api.ts` does the counting, so these numbers match Search's hint. The row has a fixed height so the prompt doesn't move when the overview loads. With no graph it reads "No project loaded."
-- The prompt box: an auto-growing textarea with the placeholder "Ask me anything about the code base…", a `+` (add context) button bottom-left and an `ArrowRight` send button bottom-right. Enter sends and Shift+Enter adds a new line.
+- The prompt box: an auto-growing textarea with the placeholder "Ask me anything about the code base…", a `+` (add context) button bottom-left and a `primary` `ArrowRight` send button bottom-right. Enter sends and Shift+Enter adds a new line.
 - A row of outline suggestion chips ("Explain a module", "Find dead code", "Find callers"). Each fills the prompt with a fuller request that says what to cover and how to list results. A `[bracketed]` blank such as `[function name]` is selected when the chip fills the prompt, so typing replaces it. Prompts without a blank put the cursor at the end.
 On load the column's parts enter one after another, top to bottom, 80ms apart: the logo, the title, the project row, the prompt box and the chips. Each one fades in, rises 0.5rem and comes into focus from a 4px blur, using `animate-intro` (500ms) from `style.css`. The tunnel fades in over 1s. It's all `motion-safe:`, so reduced motion shows the page at once. The prompt box animates inside its measured wrapper, because the tunnel reads that wrapper's position and a transform on it would throw off the vanishing point.
 
@@ -134,7 +137,7 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
 1. **Agent list** (250px, hidden on mobile):
    - Each agent shows an `AgentIcon`, then its bold one-line title. The description sits underneath, indented to line up with the title, and is cut off after 6 lines.
    - A border separates agents. The open agent gets the `accent` fill.
-   - A full-width raised "+ Create" button below the list goes to Home, where new agents start.
+   - A full-width `primary` "+ Create" button below the list goes to Home, where new agents start.
 2. **Conversation**:
    - Header (44px, bottom border): `AgentIcon` and the title in `font-medium`.
    - User messages: right-aligned raised bubbles (`UserMessage` in `chat.tsx`).
