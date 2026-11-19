@@ -1,7 +1,7 @@
-import { ArrowLeft, ScrollText, Search as SearchIcon, Trash2 } from "lucide-react";
+import { ArrowLeft, NotebookText, Search as SearchIcon, Trash2 } from "lucide-react";
 import { type MouseEvent, useEffect, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
-import { type Artifact, artifactHref, type FileText, fetchJson, fileUrl, queryUrl, type SymbolHit, useApi } from "@/api";
+import { type FileText, fetchJson, fileUrl, type Note, noteHref, queryUrl, type SymbolHit, useApi } from "@/api";
 import { MARKDOWN } from "@/chat";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,12 +9,12 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { fuzzyFilter } from "@/fuzzy";
 import { cn } from "@/lib/utils";
-import { forgetArtifact, rememberArtifact } from "@/recent";
+import { forgetNote, rememberNote } from "@/recent";
 import { FileRow, GraphUnavailable } from "@/search";
 import { type FileRef, SourcePanel } from "@/source";
 import { searchHref } from "@/symbol";
 
-/** The topic in #/artifacts/<topic>, which a hand-edited URL can leave badly encoded. */
+/** The topic in #/notes/<topic>, which a hand-edited URL can leave badly encoded. */
 export function decodeTopic(id?: string) {
   if (!id) return undefined;
   try {
@@ -24,7 +24,7 @@ export function decodeTopic(id?: string) {
   }
 }
 
-// Artifacts are documents, so they keep their headings. The page's h1 is the topic, so they start at h2.
+// Field notes are documents, so they keep their headings. The page's h1 is the topic, so they start at h2.
 const DOC_MARKDOWN: Components = {
   ...MARKDOWN,
   h1: ({ children }) => <h2 className="pt-2 text-lg font-bold tracking-tight">{children}</h2>,
@@ -39,27 +39,27 @@ const formatDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { d
 
 const changedLabel = (n: number) => (n === 1 ? "1 file changed" : `${n} files changed`);
 
-/** Artifact list, the open artifact and a source panel. Without a `topic` the newest opens on desktop. */
-export function Artifacts({ topic }: { topic?: string }) {
-  const list = useApi<Artifact[]>("/api/artifacts");
+/** Field note list, the open note and a source panel. Without a `topic` the newest opens on desktop. */
+export function Notes({ topic }: { topic?: string }) {
+  const list = useApi<Note[]>("/api/notes");
   // Dropped locally on delete, rather than refetching the list.
   const [deleted, setDeleted] = useState<ReadonlySet<string>>(new Set());
   const [query, setQuery] = useState("");
-  const all = (list.data ?? []).filter((a) => !deleted.has(a.topic));
-  const artifact = topic ? all.find((a) => a.topic === topic) : all[0];
-  // Only artifacts the user picked, not the newest opened by default.
-  const opened = topic && artifact ? topic : undefined;
+  const all = (list.data ?? []).filter((n) => !deleted.has(n.topic));
+  const note = topic ? all.find((n) => n.topic === topic) : all[0];
+  // Only notes the user picked, not the newest opened by default.
+  const opened = topic && note ? topic : undefined;
   useEffect(() => {
-    if (opened) rememberArtifact(opened);
+    if (opened) rememberNote(opened);
   }, [opened]);
   if (list.error?.notLoaded) return <GraphUnavailable error={list.error} />;
 
   const none = !!list.data && all.length === 0;
   const q = query.trim();
-  const artifacts = fuzzyFilter(all, q, (a) => [a.topic, a.summary, ...a.files, ...a.symbols]);
+  const notes = fuzzyFilter(all, q, (n) => [n.topic, n.summary, ...n.files, ...n.symbols]);
   return (
     <div className="relative flex min-h-0 flex-1">
-      {/* On mobile the list is the page until an artifact is open, like Search's results. */}
+      {/* On mobile the list is the page until a note is open, like Search's results. */}
       <div className={cn("flex w-full flex-col md:w-80 md:shrink-0 md:border-r", (topic || none) && "hidden md:flex")}>
         <div role="search" className="border-b p-4">
           <InputGroup>
@@ -67,8 +67,8 @@ export function Artifacts({ topic }: { topic?: string }) {
               <SearchIcon />
             </InputGroupAddon>
             <InputGroupInput
-              aria-label="Find an artifact"
-              placeholder="Find an artifact…"
+              aria-label="Find a field note"
+              placeholder="Find a field note…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && setQuery("")}
@@ -77,14 +77,14 @@ export function Artifacts({ topic }: { topic?: string }) {
             />
           </InputGroup>
         </div>
-        <nav aria-label="Artifacts" className="flex-1 overflow-y-auto">
+        <nav aria-label="Field notes" className="flex-1 overflow-y-auto">
           {list.error && <p className="border-b p-4 text-muted-foreground">{list.error.message}</p>}
-          {q && artifacts.length === 0 && <p className="border-b p-4 text-muted-foreground">No artifacts match “{q}”.</p>}
-          {artifacts.map((a) => (
+          {q && notes.length === 0 && <p className="border-b p-4 text-muted-foreground">No field notes match “{q}”.</p>}
+          {notes.map((n) => (
             <a
-              key={a.topic}
-              href={artifactHref(a.topic)}
-              aria-current={a === artifact ? "page" : undefined}
+              key={n.topic}
+              href={noteHref(n.topic)}
+              aria-current={n === note ? "page" : undefined}
               className={cn(
                 "flex gap-2 border-b p-4 hover:bg-accent",
                 // Without a topic, mobile shows only the list, so the newest isn't open there.
@@ -92,71 +92,71 @@ export function Artifacts({ topic }: { topic?: string }) {
               )}
             >
               <span className="flex h-5 shrink-0 items-center">
-                <ScrollText className="size-4 text-muted-foreground" />
+                <NotebookText className="size-4 text-muted-foreground" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate font-semibold">{a.topic}</span>
-                <span className="mt-1 line-clamp-3">{a.summary}</span>
+                <span className="block truncate font-semibold">{n.topic}</span>
+                <span className="mt-1 line-clamp-3">{n.summary}</span>
                 <span className="mt-1 block text-muted-foreground">
-                  {formatDay(a.updatedAt)}
-                  {a.staleFiles.length > 0 && ` · ${changedLabel(a.staleFiles.length)}`}
+                  {formatDay(n.updatedAt)}
+                  {n.staleFiles.length > 0 && ` · ${changedLabel(n.staleFiles.length)}`}
                 </span>
               </span>
             </a>
           ))}
         </nav>
       </div>
-      {artifact ? (
-        <ArtifactView
-          key={artifact.topic}
-          artifact={artifact}
+      {note ? (
+        <NoteView
+          key={note.topic}
+          note={note}
           className={cn(!topic && "hidden md:flex")}
           onDeleted={() => {
-            setDeleted((d) => new Set(d).add(artifact.topic));
-            forgetArtifact(artifact.topic);
+            setDeleted((d) => new Set(d).add(note.topic));
+            forgetNote(note.topic);
           }}
         />
       ) : none ? (
-        <p className="m-auto px-4 text-center text-muted-foreground">No artifacts yet. Agents save one after a long investigation.</p>
+        <p className="m-auto px-4 text-center text-muted-foreground">No field notes yet. Agents save one after a long investigation.</p>
       ) : (
-        topic && list.data && <p className="m-auto px-4 text-muted-foreground">Artifact not found.</p>
+        topic && list.data && <p className="m-auto px-4 text-muted-foreground">Field note not found.</p>
       )}
     </div>
   );
 }
 
-function ArtifactView({ artifact, className, onDeleted }: { artifact: Artifact; className?: string; onDeleted: () => void }) {
+function NoteView({ note, className, onDeleted }: { note: Note; className?: string; onDeleted: () => void }) {
   const [peek, setPeek] = useState<FileRef | null>(null);
   const source = useApi<FileText>(peek ? fileUrl(peek.path) : null);
-  const stale = new Set(artifact.staleFiles);
+  const stale = new Set(note.staleFiles);
   return (
     <>
-      <section aria-label={artifact.topic} className={cn("flex min-w-0 flex-1 flex-col", className)}>
+      <section aria-label={note.topic} className={cn("flex min-w-0 flex-1 flex-col", className)}>
         <header className="flex h-11 shrink-0 items-center gap-2 border-b pr-2 pl-4">
-          <Button variant="ghost" size="icon-sm" className="-ml-2 text-muted-foreground md:hidden" aria-label="Back to artifacts" asChild>
-            <a href="#/artifacts">
+          <Button variant="ghost" size="icon-sm" className="-ml-2 text-muted-foreground md:hidden" aria-label="Back to field notes" asChild>
+            <a href="#/notes">
               <ArrowLeft />
             </a>
           </Button>
-          <ScrollText className="size-4 shrink-0 text-muted-foreground" />
-          <h1 className="truncate font-medium">{artifact.topic}</h1>
-          <DeleteArtifact artifact={artifact} onDeleted={onDeleted} />
+          <NotebookText className="size-4 shrink-0 text-muted-foreground" />
+          <h1 className="truncate font-medium">{note.topic}</h1>
+          <DeleteNote note={note} onDeleted={onDeleted} />
         </header>
         <div className="flex-1 overflow-y-auto p-4">
           <article className="mx-auto max-w-3xl space-y-6">
             <div className="space-y-1">
-              <p className="text-muted-foreground">{artifact.summary}</p>
-              <p className="text-xs text-muted-foreground">Updated {formatDate(artifact.updatedAt)}</p>
+              <p className="text-muted-foreground">{note.summary}</p>
+              <p className="text-xs text-muted-foreground">Updated {formatDate(note.updatedAt)}</p>
             </div>
             <div className="space-y-3 break-words">
-              <Markdown components={DOC_MARKDOWN}>{artifact.markdown}</Markdown>
+              <Markdown components={DOC_MARKDOWN}>{note.markdown}</Markdown>
             </div>
-            {artifact.files.length > 0 && (
+            {note.files.length > 0 && (
               <section aria-label="Files" className="space-y-2">
                 <h2 className="font-bold tracking-tight">Files</h2>
                 {/* The rows bring their own bottom borders; the box draws the last one. */}
                 <div className="overflow-hidden rounded-md border [&>*:last-child]:border-b-0">
-                  {artifact.files.map((f) => (
+                  {note.files.map((f) => (
                     <FileRow
                       key={f}
                       file={f}
@@ -168,12 +168,12 @@ function ArtifactView({ artifact, className, onDeleted }: { artifact: Artifact; 
                 </div>
               </section>
             )}
-            {artifact.symbols.length > 0 && (
+            {note.symbols.length > 0 && (
               <section aria-label="Symbols" className="space-y-2">
                 <h2 className="font-bold tracking-tight">Symbols</h2>
                 <div className="flex flex-wrap gap-1.5">
-                  {artifact.symbols.map((s) => (
-                    <SymbolChip key={s} name={s} files={artifact.files} />
+                  {note.symbols.map((s) => (
+                    <SymbolChip key={s} name={s} files={note.files} />
                   ))}
                 </div>
               </section>
@@ -187,8 +187,8 @@ function ArtifactView({ artifact, className, onDeleted }: { artifact: Artifact; 
 }
 
 /**
- * Opens Search on the name with the symbol selected. Artifacts store only names, so the click looks it up,
- * preferring a definition in the artifact's files. With no match, Search just shows the results for the name.
+ * Opens Search on the name with the symbol selected. Notes store only names, so the click looks it up,
+ * preferring a definition in the note's files. With no match, Search just shows the results for the name.
  */
 function SymbolChip({ name, files }: { name: string; files: string[] }) {
   const open = async (e: MouseEvent<HTMLAnchorElement>) => {
@@ -208,7 +208,7 @@ function SymbolChip({ name, files }: { name: string; files: string[] }) {
 }
 
 /** The header's delete button, which asks first. */
-function DeleteArtifact({ artifact, onDeleted }: { artifact: Artifact; onDeleted: () => void }) {
+function DeleteNote({ note, onDeleted }: { note: Note; onDeleted: () => void }) {
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
@@ -216,10 +216,10 @@ function DeleteArtifact({ artifact, onDeleted }: { artifact: Artifact; onDeleted
     setDeleting(true);
     setError(undefined);
     try {
-      await fetchJson(`/api/artifacts?${new URLSearchParams({ topic: artifact.topic })}`, { method: "DELETE" });
+      await fetchJson(`/api/notes?${new URLSearchParams({ topic: note.topic })}`, { method: "DELETE" });
       onDeleted();
-      // Replaced, so Back skips the deleted artifact.
-      location.replace("#/artifacts");
+      // Replaced, so Back skips the deleted note.
+      location.replace("#/notes");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setDeleting(false);
@@ -229,16 +229,16 @@ function DeleteArtifact({ artifact, onDeleted }: { artifact: Artifact; onDeleted
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="ml-auto text-muted-foreground" aria-label="Delete artifact" onClick={() => setOpen(true)}>
+          <Button variant="ghost" size="icon-sm" className="ml-auto text-muted-foreground" aria-label="Delete field note" onClick={() => setOpen(true)}>
             <Trash2 />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">Delete artifact</TooltipContent>
+        <TooltipContent side="bottom">Delete field note</TooltipContent>
       </Tooltip>
       <DialogContent showCloseButton={false} className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-base font-bold tracking-tight">Delete this artifact?</DialogTitle>
-          <DialogDescription>“{artifact.topic}” will be gone for good, and agents won’t find it anymore.</DialogDescription>
+          <DialogTitle className="text-base font-bold tracking-tight">Delete this field note?</DialogTitle>
+          <DialogDescription>“{note.topic}” will be gone for good, and agents won’t find it anymore.</DialogDescription>
         </DialogHeader>
         {error && <p className="text-muted-foreground">{error}</p>}
         <DialogFooter>

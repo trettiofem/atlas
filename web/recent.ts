@@ -62,15 +62,22 @@ export const rememberSymbol = symbols.remember;
 /** The symbols last opened in Search, newest first. */
 export const useRecentSymbols = symbols.use;
 
-const artifacts = recentList<{ topic: string }>("atlas.recentArtifacts", (a, b) => a.topic === b.topic);
+// Field notes used to be called artifacts.
+const oldNotes = localStorage.getItem("atlas.recentArtifacts");
+if (oldNotes !== null) {
+  if (localStorage.getItem("atlas.recentNotes") === null) localStorage.setItem("atlas.recentNotes", oldNotes);
+  localStorage.removeItem("atlas.recentArtifacts");
+}
 
-export const rememberArtifact = (topic: string) => artifacts.remember({ topic });
+const notes = recentList<{ topic: string }>("atlas.recentNotes", (a, b) => a.topic === b.topic);
 
-/** Drops a deleted artifact. */
-export const forgetArtifact = (topic: string) => artifacts.forget({ topic });
+export const rememberNote = (topic: string) => notes.remember({ topic });
 
-/** The artifacts last opened, newest first. */
-export const useRecentArtifacts = artifacts.use;
+/** Drops a deleted field note. */
+export const forgetNote = (topic: string) => notes.forget({ topic });
+
+/** The field notes last opened, newest first. */
+export const useRecentNotes = notes.use;
 
 const agents = recentList<{ id: string }>("atlas.recentAgents", (a, b) => a.id === b.id);
 

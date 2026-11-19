@@ -94,38 +94,39 @@ Code asks you to approve it the first time you start a session in this repo. Loa
 | `file_dependencies` / `file_dependents` | file-level imports in either direction |
 | `tests_for` | test files reaching the symbol directly or through callers |
 | `impact` | files affected by changing the symbol |
-| `find_artifacts` | saved write-ups about the project, by text, file or symbol, with the files changed since |
-| `save_artifact` | saves (or replaces, by topic) a markdown write-up of an investigation |
+| `find_notes` | field notes about the project, by text, file or symbol, with the files changed since |
+| `save_note` | saves (or replaces, by topic) a field note, a markdown write-up of an investigation |
 
 Name-based tools take an optional `file` to pick one of several symbols with the same name. Results carry both
 `file` (project-relative) and `path` (absolute), and file inputs accept either. Every tool except
-`save_artifact` is read-only.
+`save_note` is read-only.
 
-### Artifacts
+### Field notes
 
-An artifact is a markdown write-up that an agent saves after a long investigation, such as how a pipeline fits
+A field note is a markdown write-up that an agent saves after a long investigation, such as how a pipeline fits
 together, its invariants and pitfalls, and where to look. Later agents read it instead of investigating the same
-component again. It works like a README for agents. Each artifact has a `topic` (unique per project, so saving it
+component again. It works like a README for agents. Each note has a `topic` (unique per project, so saving it
 again replaces it), a one-line `summary`, the `markdown`, and the `files` and `symbols` it covers.
 
-`find_artifacts` matches every word of `query` against the topic, summary and markdown, and can filter by a
-covered `file` or `symbol`. Each result lists its `staleFiles`, the covered files modified after the artifact was
-saved (or since deleted), so the agent knows what to check against the current code. Artifacts belong to the
+`find_notes` matches every word of `query` against the topic, summary and markdown, and can filter by a
+covered `file` or `symbol`. Each result lists its `staleFiles`, the covered files modified after the note was
+saved (or since deleted), so the agent knows what to check against the current code. Notes belong to the
 loaded project's root and survive `pnpm graph sync`. The MCP instructions and the
-[code-graph skill](.claude/skills/code-graph/SKILL.md) tell agents to look for artifacts first and to save one
+[code-graph skill](.claude/skills/code-graph/SKILL.md) tell agents to look for field notes first and to save one
 after a long investigation.
 
-In the web UI, the Artifacts page lists them, renders their markdown, flags stale files and deletes them. It
-reads `GET /api/artifacts` (every artifact of the loaded project, with its `staleFiles`) and deletes with
-`DELETE /api/artifacts?topic=<topic>`. There's no editing: agents write artifacts, people read and prune them.
+In the web UI, the Field notes page lists them, renders their markdown, flags stale files and deletes them. It
+reads `GET /api/notes` (every note of the loaded project, with its `staleFiles`) and deletes with
+`DELETE /api/notes?topic=<topic>`. There's no editing: agents write field notes, people read and prune them.
 
-Artifacts are rows of the `artifacts` table in `atlas.db` (git-ignored), a SQLite file opened with Node's built-in
+Field notes are rows of the `notes` table in `atlas.db` (git-ignored; the table was called `artifacts` before and is
+renamed on first open), a SQLite file opened with Node's built-in
 `node:sqlite` ([src/store.ts](src/store.ts)) and shared with the agents. It's separate from the code graph in
 `graph-db/`. Files and symbols are JSON columns, not edges into the graph. The file is in WAL mode with a busy
 timeout, so every MCP server process writes it directly.
 
-> **Warning: artifacts have no history, authorship or review.** Whatever an agent writes is served to the next one,
-> and a save overwrites the topic. See [src/artifacts-db.ts](src/artifacts-db.ts).
+> **Warning: field notes have no history, authorship or review.** Whatever an agent writes is served to the next one,
+> and a save overwrites the topic. See [src/notes-db.ts](src/notes-db.ts).
 
 The [code-graph skill](.claude/skills/code-graph/SKILL.md) tells agents when to use these tools instead of
 grep, which workflows to follow, and the graph's blind spots. To run the server by hand, use
@@ -181,7 +182,7 @@ with the MCP client SDK (the same command as `.mcp.json`), so agents get exactly
 does, plus a local `show_code` tool that puts a file's lines into the transcript. Each tool call is a step in the
 transcript, and answers stream in as markdown.
 
-Agents are rows of the `agents` table in `atlas.db`, the SQLite file artifacts use. Each row holds the agent's
+Agents are rows of the `agents` table in `atlas.db`, the SQLite file field notes use. Each row holds the agent's
 turns and its Anthropic message history as JSON columns, and every save rewrites them. The web server keeps
 agents in memory and saves them as they change, so run one `pnpm web` at a time.
 
@@ -201,6 +202,6 @@ Other commands: `index [file]`, `load [file]`, `sync`. Run `pnpm graph` with no 
 
 Sources: `src/main.ts` (CLI entry point), `src/mcp.ts` (MCP server), `src/web.ts` + `src/api.ts` (web UI server),
 `web/` (React UI), `src/queries.ts` (Cypher queries shared by
-all three), `src/graph.ts` (the Code Graph page's queries and path search), `src/source.ts` (source slicing), `src/store.ts` (the SQLite file for agents and artifacts), `src/agents-db.ts` (agent store), `src/artifacts-db.ts` (artifact store), `src/index.ts` (runs scip-typescript), `src/parse.ts`
+all three), `src/graph.ts` (the Code Graph page's queries and path search), `src/source.ts` (source slicing), `src/store.ts` (the SQLite file for agents and field notes), `src/agents-db.ts` (agent store), `src/notes-db.ts` (field note store), `src/index.ts` (runs scip-typescript), `src/parse.ts`
 (SCIP -> graph), `src/load.ts` (graph -> RelateDB), `src/db.ts` (store access), `src/types.ts` (SCIP and graph
 types), `src/languages.ts` (per-language rules), `schemas/graph.cypher` (graph schema).

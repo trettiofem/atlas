@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type ArtifactInput, ArtifactsDb } from "./artifacts-db.js";
+import { type NoteInput, NotesDb } from "./notes-db.js";
 import { openStore } from "./store.js";
 
-const input = (over: Partial<ArtifactInput> = {}): ArtifactInput => ({
+const input = (over: Partial<NoteInput> = {}): NoteInput => ({
   project: "/repo",
   topic: "Graph loading",
   summary: "How a SCIP index becomes the RelateDB graph.",
@@ -15,24 +15,24 @@ const input = (over: Partial<ArtifactInput> = {}): ArtifactInput => ({
   ...over,
 });
 
-const open = () => new ArtifactsDb(openStore(":memory:"));
+const open = () => new NotesDb(openStore(":memory:"));
 
-describe("ArtifactsDb", () => {
-  it("round-trips an artifact", () => {
+describe("NotesDb", () => {
+  it("round-trips a note", () => {
     const db = open();
     expect(db.save(input(), 1000)).toEqual({ replaced: false });
     const { project: _, ...rest } = input();
     expect(db.find({ project: "/repo" })).toEqual([{ ...rest, createdAt: 1000, updatedAt: 1000 }]);
   });
 
-  it("replaces an artifact with the same topic, keeping its creation time", () => {
+  it("replaces a note with the same topic, keeping its creation time", () => {
     const db = open();
     db.save(input(), 1000);
     expect(db.save(input({ summary: "Updated.", files: [] }), 2000)).toEqual({ replaced: true });
     expect(db.find({ project: "/repo" })).toMatchObject([{ summary: "Updated.", files: [], createdAt: 1000, updatedAt: 2000 }]);
   });
 
-  it("scopes artifacts to their project", () => {
+  it("scopes notes to their project", () => {
     const db = open();
     db.save(input());
     db.save(input({ project: "/other" }));
@@ -44,7 +44,7 @@ describe("ArtifactsDb", () => {
     const db = open();
     db.save(input(), 1000);
     db.save(input({ topic: "Path search", summary: "Bidirectional BFS.", markdown: "One query per hop.", files: ["src/graph.ts"], symbols: ["findPath"] }), 2000);
-    const topics = (filter: object) => db.find({ project: "/repo", ...filter }).map((a) => a.topic);
+    const topics = (filter: object) => db.find({ project: "/repo", ...filter }).map((n) => n.topic);
     expect(topics({})).toEqual(["Path search", "Graph loading"]);
     expect(topics({ query: "BFS hop" })).toEqual(["Path search"]);
     expect(topics({ query: "GRAPH" })).toEqual(["Graph loading"]);
@@ -54,7 +54,7 @@ describe("ArtifactsDb", () => {
     expect(topics({ limit: 1 })).toEqual(["Path search"]);
   });
 
-  it("deletes an artifact by project and topic", () => {
+  it("deletes a note by project and topic", () => {
     const db = open();
     db.save(input());
     db.save(input({ project: "/other" }));
@@ -64,12 +64,24 @@ describe("ArtifactsDb", () => {
     expect(db.find({ project: "/other" })).toHaveLength(1);
   });
 
+  it("keeps the notes of a store from when they were artifacts", () => {
+    const store = openStore(":memory:");
+    store.exec(`CREATE TABLE artifacts (
+      project TEXT NOT NULL, topic TEXT NOT NULL, summary TEXT NOT NULL, markdown TEXT NOT NULL,
+      files TEXT NOT NULL, symbols TEXT NOT NULL,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      PRIMARY KEY (project, topic)
+    )`);
+    store.exec(`INSERT INTO artifacts VALUES ('/repo', 'Old', 'Saved before.', 'Text.', '[]', '[]', 1000, 1000)`);
+    expect(new NotesDb(store).find({ project: "/repo" }).map((n) => n.topic)).toEqual(["Old"]);
+  });
+
   it("lets two connections to one file both write", () => {
-    const dir = mkdtempSync(join(tmpdir(), "artifacts-"));
+    const dir = mkdtempSync(join(tmpdir(), "notes-"));
     try {
       const path = join(dir, "atlas.db");
-      const a = new ArtifactsDb(openStore(path));
-      const b = new ArtifactsDb(openStore(path));
+      const a = new NotesDb(openStore(path));
+      const b = new NotesDb(openStore(path));
       a.save(input({ topic: "From a" }), 1000);
       b.save(input({ topic: "From b" }), 2000);
       expect(a.find({ project: "/repo" }).map((x) => x.topic)).toEqual(["From b", "From a"]);

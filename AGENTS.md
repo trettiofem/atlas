@@ -10,8 +10,8 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - [src/web.ts](src/web.ts) is the Vite config. It is inline with `configFile: false` and sets the Tailwind plugin and the `@` → `web/` alias. There is no `vite.config.ts`.
 - shadcn components are in `web/components/ui/` and `cn` is in `web/lib/utils.ts`. These files are ours to edit. The shadcn CLI doesn't run in this layout (no `package.json` in `web/`). To add a component, fetch `https://ui.shadcn.com/r/styles/new-york-v4/<name>.json`, write its `files[].content`, rewrite `@/registry/new-york-v4/ui/` → `@/components/ui/` and `"cn"` → `"@/lib/utils"`, and add its npm `dependencies` at the repo root.
 - Theme tokens are in [web/style.css](web/style.css).
-- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/artifacts[/<topic>]`, `#/graph[?<params>]`. It also sets the document title from the route: the open symbol, agent or artifact, then the page, then "Atlas" (`_minColorDistance · Symbols · Atlas`). Home is just "Atlas".
-- Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx), [web/agents.tsx](web/agents.tsx), [web/artifacts.tsx](web/artifacts.tsx) and [web/graph.tsx](web/graph.tsx) (Code Graph).
+- [web/main.tsx](web/main.tsx) holds the shell and the hash routes: `#/`, `#/search[?<params>]`, `#/agents[/<id>]`, `#/notes[/<topic>]`, `#/graph[?<params>]`. It also sets the document title from the route: the open symbol, agent or field note, then the page, then "Atlas" (`_minColorDistance · Symbols · Atlas`). Home is just "Atlas".
+- Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx), [web/agents.tsx](web/agents.tsx), [web/notes.tsx](web/notes.tsx) (Field notes) and [web/graph.tsx](web/graph.tsx) (Code Graph).
 - Shared components:
   - [web/app-sidebar.tsx](web/app-sidebar.tsx).
  - [web/project-header.tsx](web/project-header.tsx): `ProjectHeader`, the 40px bar above every page (bottom border). On the left are ghost switchers in mono `text-xs`: `FolderGit2` with the repo and `GitBranch` with the branch, each followed by `ChevronsUpDown`. On the right, muted "92 files · 16 tests · 736 symbols" from `/api/overview` (`overviewCounts`, so the numbers match Search's hint), or "No graph loaded." The counts are hidden on phones. On mobile the sidebar trigger sits at its start. The repo and branch are mock data (`PROJECT` in `mock.tsx`), and the switchers don't open yet.
@@ -27,9 +27,9 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
  - [web/graph-canvas.tsx](web/graph-canvas.tsx): `GraphCanvas`, the Cytoscape view of the Code Graph, and [web/graph-model.ts](web/graph-model.ts), the pure model of what it shows (tested in `graph-model.test.ts`).
 - **Backend**: everything is live. [web/api.ts](web/api.ts) has the row, graph, agent and turn types, `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests, and `fetchJson` for one-off requests and POSTs. A 503 means no graph is loaded, or, for agent routes, that `CLAUDE_API_KEY` isn't set.
 - **Agents and the Explain chat** run on the server with the Anthropic Messages API, Haiku by default (`CLAUDE_MODEL` overrides it), using the key in `.env` (`CLAUDE_API_KEY`). [src/agent.ts](src/agent.ts) is the run loop. It starts [src/mcp.ts](src/mcp.ts) as an MCP client over stdio, so Claude gets the same code-graph tools as Claude Code, plus a local `show_code` tool that adds a file reference with its lines to the transcript. [src/agents.ts](src/agents.ts) keeps agents in memory, streams changes, and recovers agents a stopped server left working.
-- **Agents storage**: [src/agents-db.ts](src/agents-db.ts) saves agents in SQLite, in the `agents` table of `atlas.db` (git-ignored, opened by [src/store.ts](src/store.ts) and shared with artifacts), separate from the code graph. Turns and the Anthropic history are JSON columns. Agents have no owner yet; add users before agents have several.
+- **Agents storage**: [src/agents-db.ts](src/agents-db.ts) saves agents in SQLite, in the `agents` table of `atlas.db` (git-ignored, opened by [src/store.ts](src/store.ts) and shared with field notes), separate from the code graph. Turns and the Anthropic history are JSON columns. Agents have no owner yet; add users before agents have several.
 - **Mock data**: the user (`USER` in [web/mock.tsx](web/mock.tsx)), shown in the sidebar footer and as every agent's creator, and the project header's repo and branch (`PROJECT`).
-- **Recent**: [web/recent.ts](web/recent.ts) keeps, in localStorage and each with the time it was touched, the last 8 symbols opened in Search, artifacts opened (deleting one drops it) and agents opened or messaged. Opening means picking one, not the newest a page shows by default. The sidebar's "Recent" merges them.
+- **Recent**: [web/recent.ts](web/recent.ts) keeps, in localStorage and each with the time it was touched, the last 8 symbols opened in Search, field notes opened (deleting one drops it) and agents opened or messaged. Opening means picking one, not the newest a page shows by default. The sidebar's "Recent" merges them.
 
 ### Design tokens
 
@@ -88,14 +88,14 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 - On mobile it becomes a sheet, opened by a trigger at the start of the project header.
 - **Expanded**:
   - Header: `LogoWordmark.svg` on the left and the collapse trigger on the right.
-  - Nav: Home (`House`), Agents (`Bot`), Artifacts (`ScrollText`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
-  - "Recent": the 8 symbols, artifacts and agents the user last touched, in one list, the last touched first. An agent's time is when it was created, or later when the user opened or messaged it. Symbols show their `SymbolIcon` and mono text and link back to Search, artifacts `ScrollText` and the topic, agents `AgentIcon` and the title, both in sans text. All entries truncate with an ellipsis.
+  - Nav: Home (`House`), Agents (`Bot`), Field notes (`NotebookText`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
+  - "Recent": the 8 symbols, field notes and agents the user last touched, in one list, the last touched first. An agent's time is when it was created, or later when the user opened or messaged it. Symbols show their `SymbolIcon` and mono text and link back to Search, field notes `NotebookText` and the topic, agents `AgentIcon` and the title, both in sans text. All entries truncate with an ellipsis.
   - Footer: the user, with the 24px `UserLarge.svg` avatar, the name in `font-medium` and the muted org underneath. It's mock data (`USER` in `mock.tsx`) and does nothing yet.
 - **Collapsed**: `Logo.svg` at the top, nav icons with tooltips, "Recent" hidden, and at the bottom the avatar above the trigger.
 - What the nav items do:
   - Home: start a chat. Sending a prompt creates an agent and opens the Agents page.
   - Agents: create and manage agents that search the code base.
-  - Artifacts: read and delete the write-ups agents saved.
+  - Field notes: read and delete the write-ups agents saved.
   - Symbols: find symbols.
   - Code Graph: interactive graph exploration.
 
@@ -186,17 +186,17 @@ A one-time chat about highlighted code. It isn't an agent: it doesn't show on th
    - The reference's lines are highlighted and scrolled to the center each time it's opened. Hovering the highlight shows the Explain tip, like Search's Source tab. With no symbol name, the Explain dialog's header uses the file's basename.
    - **Code highlight** (from `CodeLines` in `source.tsx`, the same in the snippet, the panel and Search's Source tab): a `bg-blue/10` tint across the full line width plus a 2px `border-blue` left edge. Blue means "look here": the lines the agent points at, or the definition of the symbol you picked.
 
-### Artifacts page
+### Field notes page
 
-The write-ups agents save with `save_artifact` (see the README), for reading and deleting. Agents write them, so there's no Create. `#/artifacts/<topic>` opens one (the topic is URI-encoded, since topics are unique per project), and `#/artifacts` opens the newest on desktop and just the list on mobile. Data comes from `GET /api/artifacts` (every artifact with its `staleFiles`). Without a graph it shows `GraphUnavailable`, since artifacts belong to the loaded project's root. With none it says "No artifacts yet. Agents save one after a long investigation." Three columns like Agents:
-1. **List** (320px; on mobile the whole page until an artifact is open):
-   - A top block (`border-b p-4`) with a raised `InputGroup`, "Find an artifact…", filtering with `fuzzyFilter` on the topic, summary, files and symbols (Escape clears it). With no match: "No artifacts match “x”."
-   - Rows: `ScrollText`, the bold one-line topic, the summary underneath (cut after 3 lines), and a muted line with the day it was last updated, plus "· 2 files changed" when covered files changed since it was saved. A border separates rows, and the open one gets the `accent` fill.
-2. **Artifact view**:
-   - Header (44px): on mobile an `ArrowLeft` back to the list, `ScrollText`, the topic in `font-medium`, and a ghost `Trash2` ("Delete artifact"). It asks first, like deleting an agent ("Delete this artifact?"), then sends `DELETE /api/artifacts?topic=`, drops it from the list and opens the newest.
+The write-ups agents save with `save_note` (see the README), for reading and deleting. In code, the API, the route and the MCP tools they're "notes"; the UI always says "field notes". Agents write them, so there's no Create. `#/notes/<topic>` opens one (the topic is URI-encoded, since topics are unique per project), and `#/notes` opens the newest on desktop and just the list on mobile. Data comes from `GET /api/notes` (every note with its `staleFiles`). Without a graph it shows `GraphUnavailable`, since notes belong to the loaded project's root. With none it says "No field notes yet. Agents save one after a long investigation." Three columns like Agents:
+1. **List** (320px; on mobile the whole page until a note is open):
+   - A top block (`border-b p-4`) with a raised `InputGroup`, "Find a field note…", filtering with `fuzzyFilter` on the topic, summary, files and symbols (Escape clears it). With no match: "No field notes match “x”."
+   - Rows: `NotebookText`, the bold one-line topic, the summary underneath (cut after 3 lines), and a muted line with the day it was last updated, plus "· 2 files changed" when covered files changed since it was saved. A border separates rows, and the open one gets the `accent` fill.
+2. **Note view**:
+   - Header (44px): on mobile an `ArrowLeft` back to the list, `NotebookText`, the topic in `font-medium`, and a ghost `Trash2` ("Delete field note"). It asks first, like deleting an agent ("Delete this field note?"), then sends `DELETE /api/notes?topic=`, drops it from the list and opens the newest.
    - The muted summary and "Updated <date>", then the markdown. Unlike answers it keeps its headings (`font-bold tracking-tight`, a markdown `#` is an `h2` under the topic). Lists, links and code blocks are the chat's (`MARKDOWN` in `chat.tsx`).
    - "Files": a bordered box of Search's `FileRow`s, with "changed since" on the right for stale files. They open the source panel.
-   - "Symbols": `outline` mono chips that open Search with the name in the field and the symbol selected. Artifacts store only names, so a click looks the name up (`find`), preferring a definition in the artifact's files. With no match it only searches for the name.
+   - "Symbols": `outline` mono chips that open Search with the name in the field and the symbol selected. Notes store only names, so a click looks the name up (`find`), preferring a definition in the note's files. With no match it only searches for the name.
 3. **Source panel**: `SourcePanel`, nothing highlighted, like Search's peek panel.
 
 ### Assets

@@ -2,9 +2,9 @@ import { readFile, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { hasApiKey, NO_API_KEY } from "./agent.js";
 import { createAgent, deleteAgent, explain, listAgents, parseExplain, sendMessage, subscribe } from "./agents.js";
-import { deleteArtifact, findArtifacts, staleFiles } from "./artifacts-db.js";
 import { NOT_LOADED, reader } from "./db.js";
 import { findPath, findSymbolId, getEdgesAmong, getNeighbors, getNode, isEdgeType, isNodeId, searchNodes } from "./graph.js";
+import { deleteNote, findNotes, staleFiles } from "./notes-db.js";
 import { getProject, isIndexedFile, isQueryCommand, overview, runQuery } from "./queries.js";
 import { readDefinitions, resolveInRoot } from "./source.js";
 
@@ -12,7 +12,7 @@ const MAX_SOURCE_MATCHES = 3;
 const MAX_FILE_BYTES = 1_000_000;
 const MAX_BODY_BYTES = 1_000_000;
 const MAX_EDGE_IDS = 5000;
-const MAX_ARTIFACTS = 500;
+const MAX_NOTES = 500;
 
 const LINE = /^[1-9]\d*$/;
 const AGENT = /^\/api\/agents\/([\w-]+)$/;
@@ -62,9 +62,9 @@ const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
  *   POST /api/agents/<id>/messages {prompt} a follow-up; 409 while the agent is working
  *   DELETE /api/agents/<id>                 deletes the agent, stopping it if it's working
  *   POST /api/explain {file, lines, name, messages}   NDJSON: the reply's turns so far, one snapshot per line
- * and for artifacts (see src/artifacts-db.ts), scoped to the loaded project:
- *   GET    /api/artifacts                   every artifact, newest first, each with its `staleFiles`
- *   DELETE /api/artifacts?topic=<topic>     deletes one; the topic is in the query since it can hold any character
+ * and for field notes (see src/notes-db.ts), scoped to the loaded project:
+ *   GET    /api/notes                       every note, newest first, each with its `staleFiles`
+ *   DELETE /api/notes?topic=<topic>         deletes one; the topic is in the query since it can hold any character
  */
 export async function handleApi(req: IncomingMessage, res: ServerResponse) {
   const send = (status: number, body: unknown) =>
@@ -164,16 +164,16 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse) {
         if (typeof body === "string") return send(400, { error: body });
         return streamExplain(req, res, body);
       }
-      case "/api/artifacts": {
+      case "/api/notes": {
         const root = (await getProject(reader()))?.root;
         if (!root) return send(503, { error: NOT_LOADED });
         if (req.method === "DELETE") {
           if (!p.topic) return send(400, { error: "Expected a `topic`" });
-          return deleteArtifact(root, p.topic) ? send(200, {}) : send(404, { error: "No such artifact" });
+          return deleteNote(root, p.topic) ? send(200, {}) : send(404, { error: "No such note" });
         }
         if (req.method !== "GET") return send(405, { error: "Use GET or DELETE" });
-        const found = findArtifacts({ project: root, limit: MAX_ARTIFACTS });
-        return send(200, await Promise.all(found.map(async (a) => ({ ...a, staleFiles: await staleFiles(root, a) }))));
+        const found = findNotes({ project: root, limit: MAX_NOTES });
+        return send(200, await Promise.all(found.map(async (n) => ({ ...n, staleFiles: await staleFiles(root, n) }))));
       }
     }
     const agent = url.pathname.match(AGENT);

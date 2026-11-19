@@ -89,8 +89,8 @@ export interface Agent {
   turns: Turn[];
 }
 
-// Artifact shape (see src/artifacts-db.ts and GET /api/artifacts). The topic is unique per project.
-export interface Artifact {
+// Field note shape (see src/notes-db.ts and GET /api/notes). The topic is unique per project.
+export interface Note {
   topic: string;
   summary: string;
   /** Markdown. */
@@ -100,11 +100,11 @@ export interface Artifact {
   symbols: string[];
   createdAt: number;
   updatedAt: number;
-  /** Covered files changed since the artifact was saved, or deleted. */
+  /** Covered files changed since the note was saved, or deleted. */
   staleFiles: string[];
 }
 
-export const artifactHref = (topic: string) => `#/artifacts/${encodeURIComponent(topic)}`;
+export const noteHref = (topic: string) => `#/notes/${encodeURIComponent(topic)}`;
 
 // Code Graph shapes (see src/graph.ts). Ids are `file:<path>` or `sym:<SCIP symbol>`.
 export type EdgeType = "USES" | "CONTAINS" | "DEFINES" | "REFERENCES" | "IMPORTS" | "IMPLEMENTS" | "TYPE_OF";

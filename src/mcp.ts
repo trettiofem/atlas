@@ -2,8 +2,8 @@ import type { Connection } from "@relate/relate";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { findArtifacts, saveArtifact, staleFiles } from "./artifacts-db.js";
 import { NOT_LOADED, reader } from "./db.js";
+import { findNotes, saveNote, staleFiles } from "./notes-db.js";
 import { getProject, overview, type QueryOptions, type Row, runQuery } from "./queries.js";
 import { readDefinitions, resolveInRoot, toProjectRelative } from "./source.js";
 import { NODE_KINDS } from "./types.js";
@@ -20,10 +20,10 @@ know a symbol's exact name, then \`get_source\` to read it instead of opening wh
 when a name matches several symbols, pass \`file\` to pick one. Results carry \`file\` (project-relative) and
 \`path\` (absolute). The graph is a snapshot: it doesn't see edits made since the last \`pnpm graph sync\`.
 
-Artifacts are write-ups that earlier agents saved after investigating part of this project. Before investigating a
-component, call \`find_artifacts\` (by \`query\`, \`file\` or \`symbol\`): reading one is far cheaper than redoing the
+Field notes are write-ups that earlier agents saved after investigating part of this project. Before investigating a
+component, call \`find_notes\` (by \`query\`, \`file\` or \`symbol\`): reading one is far cheaper than redoing the
 work. Check any \`staleFiles\` against the current code. After a long investigation that others are likely to repeat,
-call \`save_artifact\`. Write it for agents: the non-obvious design, invariants, pitfalls and the key symbols and
+call \`save_note\`. Write it for agents: the non-obvious design, invariants, pitfalls and the key symbols and
 files, not a restatement of the source. Skip it for small or obvious findings.`;
 
 const server = new McpServer({ name: "code-graph", version: "0.1.0" }, { instructions: INSTRUCTIONS });
@@ -214,35 +214,35 @@ server.registerTool(
 const unique = (items: string[] = []) => [...new Set(items)];
 
 server.registerTool(
-  "find_artifacts",
+  "find_notes",
   {
     description:
-      "Write-ups that earlier agents saved after investigating this project, newest first, with their full markdown. " +
+      "Field notes: write-ups that earlier agents saved after investigating this project, newest first, with their full markdown. " +
       "Every `query` word has to occur in the topic, summary or markdown. `staleFiles` lists covered files that " +
-      "changed after the artifact was saved: check those parts against the current code.",
+      "changed after the note was saved: check those parts against the current code.",
     inputSchema: {
       query: z.string().optional().describe("Words to look for, e.g. graph loading"),
-      file: z.string().optional().describe("Only artifacts covering this file, project-relative or absolute"),
-      symbol: z.string().optional().describe("Only artifacts covering this exact symbol name"),
-      limit: z.number().int().min(1).max(20).optional().describe("Most artifacts to return (default 5)"),
+      file: z.string().optional().describe("Only notes covering this file, project-relative or absolute"),
+      symbol: z.string().optional().describe("Only notes covering this exact symbol name"),
+      limit: z.number().int().min(1).max(20).optional().describe("Most notes to return (default 5)"),
     },
     annotations: readOnly,
   },
   async (args) =>
     withRoot(async (root) => {
-      const found = findArtifacts({ project: root, ...args, file: args.file && toProjectRelative(root, args.file) });
+      const found = findNotes({ project: root, ...args, file: args.file && toProjectRelative(root, args.file) });
       if (found.length === 0) {
-        return ok({ results: [], hint: "No artifacts match. Investigate, and if it took a while, save what you learned with save_artifact." });
+        return ok({ results: [], hint: "No notes match. Investigate, and if it took a while, save what you learned with save_note." });
       }
-      return ok({ results: await Promise.all(found.map(async (a) => ({ ...a, staleFiles: await staleFiles(root, a) }))) });
+      return ok({ results: await Promise.all(found.map(async (n) => ({ ...n, staleFiles: await staleFiles(root, n) }))) });
     }),
 );
 
 server.registerTool(
-  "save_artifact",
+  "save_note",
   {
     description:
-      "Save a markdown write-up of something you investigated, for later agents to read with find_artifacts. " +
+      "Save a markdown write-up (a field note) of something you investigated, for later agents to read with find_notes. " +
       "Saving an existing topic replaces it, so read it first and keep what still holds.",
     inputSchema: {
       topic: z.string().min(1).max(200).describe("Short name of what it explains, e.g. Graph loading pipeline"),
@@ -258,10 +258,10 @@ server.registerTool(
       const files = unique(args.files?.map((f) => toProjectRelative(root, f)));
       try {
         for (const f of files) resolveInRoot(root, f);
-        const { replaced } = saveArtifact({ ...args, project: root, files, symbols: unique(args.symbols) });
+        const { replaced } = saveNote({ ...args, project: root, files, symbols: unique(args.symbols) });
         return ok({ saved: args.topic, replaced });
       } catch (e) {
-        return fail(`Couldn't save the artifact: ${e instanceof Error ? e.message : String(e)}`);
+        return fail(`Couldn't save the note: ${e instanceof Error ? e.message : String(e)}`);
       }
     }),
 );

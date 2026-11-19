@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
-/** The SQLite file for agents and artifacts, shared by the web server and every MCP process. The code graph is in graph-db/. */
+/** The SQLite file for agents and field notes, shared by the web server and every MCP process. The code graph is in graph-db/. */
 export const STORE_PATH = fileURLToPath(new URL("../atlas.db", import.meta.url));
 
 const SQLITE_BUSY = 5;

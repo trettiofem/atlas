@@ -21,10 +21,10 @@ counts.
 - **You (or the user) have edited code since `loadedAt`:** results for the edited files may be stale. Re-run the
   sync if it matters for the task.
 
-## 2. Check for artifacts
+## 2. Check for field notes
 
-Artifacts are markdown write-ups that earlier agents saved after investigating part of the project. Before you
-dig into a component, call `find_artifacts` with a `query`, `file` or `symbol`. If one covers it, start from it
+Field notes are markdown write-ups that earlier agents saved after investigating part of the project. Before you
+dig into a component, call `find_notes` with a `query`, `file` or `symbol`. If one covers it, start from it
 instead of redoing the investigation. It's much cheaper. Results with `staleFiles` were written before those files
 last changed, so check the parts they cover against the current code.
 
@@ -41,8 +41,8 @@ last changed, so check the parts they cover against the current code.
 | What does this file import, and what imports it? | `file_dependencies`, `file_dependents` |
 | Which tests cover X? | `tests_for` |
 | What breaks if I change X? | `impact` |
-| Has someone already explained this? | `find_artifacts` (`query`, `file`, `symbol`, `limit`) |
-| Keep what I learned for the next agent | `save_artifact` (`topic`, `summary`, `markdown`, `files`, `symbols`) |
+| Has someone already explained this? | `find_notes` (`query`, `file`, `symbol`, `limit`) |
+| Keep what I learned for the next agent | `save_note` (`topic`, `summary`, `markdown`, `files`, `symbols`) |
 
 Results include `file` (project-relative) and `path` (absolute). Use `path` with Read or Edit. Tools accept
 either form for `file` inputs.
@@ -64,11 +64,11 @@ either form for `file` inputs.
 **Orient in a file or module**
 `outline`, then `file_dependencies` and `file_dependents`, then `get_source` on the symbols that matter.
 
-**Save an artifact after a long investigation**
+**Save a field note after a long investigation**
 Save one when understanding a component took many calls and someone else is likely to need the same answer.
 Skip it for small or obvious findings, or for anything a single `get_source` would show.
-1. `find_artifacts` on the topic first. Saving an existing `topic` replaces it, so fold in what still holds.
-2. `save_artifact` with a short `topic`, a one-sentence `summary`, and the `files` and exact `symbols` it covers,
+1. `find_notes` on the topic first. Saving an existing `topic` replaces it, so fold in what still holds.
+2. `save_note` with a short `topic`, a one-sentence `summary`, and the `files` and exact `symbols` it covers,
    so later agents can find it by file or symbol and see when it goes stale.
 3. Write the `markdown` for agents: how the parts fit together, invariants, pitfalls, why it's built that way,
    and where to look (symbol names and paths). Don't paste the source or restate what the code plainly says.
@@ -85,9 +85,9 @@ Skip it for small or obvious findings, or for anything a single `get_source` wou
   references to them aren't recorded.
 - **External code isn't included.** Symbols from dependencies (npm packages, the standard library) are
   references only, with no source.
-- **One project at a time.** Loading another project replaces the graph. Artifacts are kept per project root and
+- **One project at a time.** Loading another project replaces the graph. Field notes are kept per project root and
   survive syncs.
-- **Artifacts can be wrong or stale.** Agents wrote them, and nobody reviews them. Treat `staleFiles` as "verify
-  before relying on it", and replace an artifact when you find it's wrong.
+- **Field notes can be wrong or stale.** Agents wrote them, and nobody reviews them. Treat `staleFiles` as "verify
+  before relying on it", and replace a note when you find it's wrong.
 - **Not everything is code.** For strings, comments, config files, docs, or anything the indexer doesn't
   cover, use grep or Glob.

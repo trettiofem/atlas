@@ -1,8 +1,8 @@
-import { BookSearch, Bot, House, type LucideIcon, ScrollText, Waypoints } from "lucide-react";
+import { BookSearch, Bot, House, type LucideIcon, NotebookText, Waypoints } from "lucide-react";
 import { useMemo } from "react";
 import { AgentIcon } from "@/agent-icon";
 import { useAgents } from "@/agents-store";
-import { type Agent, artifactHref } from "@/api";
+import { type Agent, noteHref } from "@/api";
 import logo from "@/assets/Logo.svg";
 import wordmark from "@/assets/LogoWordmark.svg";
 import avatar from "@/assets/UserLarge.svg";
@@ -20,39 +20,39 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { USER } from "@/mock";
-import { RECENT_LIMIT, type RecentSymbol, useRecentAgents, useRecentArtifacts, useRecentSymbols } from "@/recent";
+import { RECENT_LIMIT, type RecentSymbol, useRecentAgents, useRecentNotes, useRecentSymbols } from "@/recent";
 import { SymbolIcon, searchHref } from "@/symbol";
 
 type RecentEntry = { at: number } & (
   | { type: "symbol"; symbol: RecentSymbol }
-  | { type: "artifact"; topic: string }
+  | { type: "note"; topic: string }
   | { type: "agent"; agent: Agent }
 );
 
 /**
- * Symbols, artifacts and agents in one list, the last touched first. An agent counts as touched when it was created,
+ * Symbols, field notes and agents in one list, the last touched first. An agent counts as touched when it was created,
  * or later when the user opened or messaged it. Entries saved before touch times existed sort last.
  */
 function useRecent(): RecentEntry[] {
   const symbols = useRecentSymbols();
-  const artifacts = useRecentArtifacts();
+  const notes = useRecentNotes();
   const touchedAgents = useRecentAgents();
   const { agents } = useAgents();
   return useMemo(() => {
     const touched = new Map(touchedAgents.map((a) => [a.id, a.at ?? 0]));
     const entries: RecentEntry[] = [
       ...symbols.map((symbol) => ({ type: "symbol" as const, at: symbol.at ?? 0, symbol })),
-      ...artifacts.map(({ topic, at }) => ({ type: "artifact" as const, at: at ?? 0, topic })),
+      ...notes.map(({ topic, at }) => ({ type: "note" as const, at: at ?? 0, topic })),
       ...agents.map((agent) => ({ type: "agent" as const, at: Math.max(touched.get(agent.id) ?? 0, agent.createdAt), agent })),
     ];
     return entries.sort((a, b) => b.at - a.at).slice(0, RECENT_LIMIT);
-  }, [symbols, artifacts, touchedAgents, agents]);
+  }, [symbols, notes, touchedAgents, agents]);
 }
 
 export const NAV: { path: string; title: string; icon: LucideIcon }[] = [
   { path: "/", title: "Home", icon: House },
   { path: "/agents", title: "Agents", icon: Bot },
-  { path: "/artifacts", title: "Artifacts", icon: ScrollText },
+  { path: "/notes", title: "Field notes", icon: NotebookText },
   { path: "/search", title: "Symbols", icon: BookSearch },
   { path: "/graph", title: "Code Graph", icon: Waypoints },
 ];
@@ -100,11 +100,11 @@ export function AppSidebar({ route }: { route: string }) {
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ) : r.type === "artifact" ? (
-                <SidebarMenuItem key={`artifact:${r.topic}`}>
+              ) : r.type === "note" ? (
+                <SidebarMenuItem key={`note:${r.topic}`}>
                   <SidebarMenuButton asChild>
-                    <a href={artifactHref(r.topic)} title={r.topic}>
-                      <ScrollText className="text-muted-foreground" />
+                    <a href={noteHref(r.topic)} title={r.topic}>
+                      <NotebookText className="text-muted-foreground" />
                       <span>{r.topic}</span>
                     </a>
                   </SidebarMenuButton>

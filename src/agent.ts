@@ -105,8 +105,8 @@ const STEP_LABELS: Record<string, (a: Record<string, unknown>) => string> = {
   file_dependents: (a) => `Found what imports ${a.file}`,
   tests_for: (a) => `Found tests for ${a.name}`,
   impact: (a) => `Checked the impact of changing ${a.name}`,
-  find_artifacts: (a) => (a.query || a.symbol || a.file ? `Looked for artifacts on ${a.query || a.symbol || a.file}` : "Looked for artifacts"),
-  save_artifact: (a) => `Saved the artifact “${a.topic}”`,
+  find_notes: (a) => (a.query || a.symbol || a.file ? `Looked for field notes on ${a.query || a.symbol || a.file}` : "Looked for field notes"),
+  save_note: (a) => `Saved the field note “${a.topic}”`,
 };
 const stepLabel = (name: string, input: Record<string, unknown>) => STEP_LABELS[name]?.(input) ?? `Queried code graph (${name})`;
 

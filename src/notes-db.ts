@@ -1,14 +1,14 @@
-// shortcut: artifacts have no versions, authors or review, and their files and symbols are JSON columns rather than
-// links into the graph. Add those before artifacts are relied on.
+// shortcut: notes have no versions, authors or review, and their files and symbols are JSON columns rather than
+// links into the graph. Add those before notes are relied on.
 import { stat } from "node:fs/promises";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { resolveInRoot } from "./source.js";
 import { openStore } from "./store.js";
 
-export interface ArtifactInput {
-  /** Absolute project root; artifacts are scoped to one project. */
+export interface NoteInput {
+  /** Absolute project root; notes are scoped to one project. */
   project: string;
-  /** Unique per project: saving the same topic again replaces the artifact. */
+  /** Unique per project: saving the same topic again replaces the note. */
   topic: string;
   summary: string;
   markdown: string;
@@ -17,13 +17,13 @@ export interface ArtifactInput {
   symbols: string[];
 }
 
-export interface Artifact extends Omit<ArtifactInput, "project"> {
+export interface Note extends Omit<NoteInput, "project"> {
   /** Milliseconds since the epoch. */
   createdAt: number;
   updatedAt: number;
 }
 
-export interface ArtifactFilter {
+export interface NoteFilter {
   project: string;
   /** Every word has to occur in the topic, summary or markdown, ignoring case. */
   query?: string;
@@ -32,41 +32,51 @@ export interface ArtifactFilter {
   limit?: number;
 }
 
-type ArtifactRow = { topic: string; summary: string; markdown: string; files: string; symbols: string; created_at: number; updated_at: number };
+type NoteRow = { topic: string; summary: string; markdown: string; files: string; symbols: string; created_at: number; updated_at: number };
 
-export class ArtifactsDb {
+export class NotesDb {
   constructor(private readonly db: DatabaseSync) {
-    db.exec(`CREATE TABLE IF NOT EXISTS artifacts (
-      project TEXT NOT NULL, topic TEXT NOT NULL, summary TEXT NOT NULL, markdown TEXT NOT NULL,
-      files TEXT NOT NULL, symbols TEXT NOT NULL,
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-      PRIMARY KEY (project, topic)
-    )`);
+    // Several processes open the store at once, so only one may rename the table notes had when they were artifacts.
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('artifacts', 'notes')").all();
+      if (tables.length === 1 && tables[0].name === "artifacts") db.exec("ALTER TABLE artifacts RENAME TO notes");
+      db.exec(`CREATE TABLE IF NOT EXISTS notes (
+        project TEXT NOT NULL, topic TEXT NOT NULL, summary TEXT NOT NULL, markdown TEXT NOT NULL,
+        files TEXT NOT NULL, symbols TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+        PRIMARY KEY (project, topic)
+      )`);
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
   }
 
-  save(artifact: ArtifactInput, now = Date.now()): { replaced: boolean } {
+  save(note: NoteInput, now = Date.now()): { replaced: boolean } {
     const { created_at } = this.db
       .prepare(
-        `INSERT INTO artifacts (project, topic, summary, markdown, files, symbols, created_at, updated_at)
+        `INSERT INTO notes (project, topic, summary, markdown, files, symbols, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (project, topic) DO UPDATE SET summary = excluded.summary, markdown = excluded.markdown,
            files = excluded.files, symbols = excluded.symbols, updated_at = excluded.updated_at
          RETURNING created_at`,
       )
       .get(
-        artifact.project,
-        artifact.topic,
-        artifact.summary,
-        artifact.markdown,
-        JSON.stringify(artifact.files),
-        JSON.stringify(artifact.symbols),
+        note.project,
+        note.topic,
+        note.summary,
+        note.markdown,
+        JSON.stringify(note.files),
+        JSON.stringify(note.symbols),
         now,
         now,
       ) as { created_at: number };
     return { replaced: created_at !== now };
   }
 
-  find({ project, query, file, symbol, limit = 5 }: ArtifactFilter): Artifact[] {
+  find({ project, query, file, symbol, limit = 5 }: NoteFilter): Note[] {
     const where = ["project = ?"];
     const params: SQLInputValue[] = [project];
     if (file != null) {
@@ -82,38 +92,38 @@ export class ArtifactsDb {
       params.push(word);
     }
     const rows = this.db
-      .prepare(`SELECT * FROM artifacts WHERE ${where.join(" AND ")} ORDER BY updated_at DESC LIMIT ?`)
-      .all(...params, limit) as ArtifactRow[];
-    return rows.map((a) => ({
-      topic: a.topic,
-      summary: a.summary,
-      markdown: a.markdown,
-      files: JSON.parse(a.files),
-      symbols: JSON.parse(a.symbols),
-      createdAt: a.created_at,
-      updatedAt: a.updated_at,
+      .prepare(`SELECT * FROM notes WHERE ${where.join(" AND ")} ORDER BY updated_at DESC LIMIT ?`)
+      .all(...params, limit) as NoteRow[];
+    return rows.map((n) => ({
+      topic: n.topic,
+      summary: n.summary,
+      markdown: n.markdown,
+      files: JSON.parse(n.files),
+      symbols: JSON.parse(n.symbols),
+      createdAt: n.created_at,
+      updatedAt: n.updated_at,
     }));
   }
 
-  /** False if the project has no artifact with this topic. */
+  /** False if the project has no note with this topic. */
   delete(project: string, topic: string): boolean {
-    return this.db.prepare("DELETE FROM artifacts WHERE project = ? AND topic = ?").run(project, topic).changes > 0;
+    return this.db.prepare("DELETE FROM notes WHERE project = ? AND topic = ?").run(project, topic).changes > 0;
   }
 }
 
-/** The artifact's files that changed after it was saved, or no longer exist. */
-export async function staleFiles(root: string, artifact: Artifact) {
+/** The note's files that changed after it was saved, or no longer exist. */
+export async function staleFiles(root: string, note: Note) {
   const changed = await Promise.all(
-    artifact.files.map((f) => stat(resolveInRoot(root, f)).then((s) => s.mtimeMs > artifact.updatedAt, () => true)),
+    note.files.map((f) => stat(resolveInRoot(root, f)).then((s) => s.mtimeMs > note.updatedAt, () => true)),
   );
-  return artifact.files.filter((_, i) => changed[i]);
+  return note.files.filter((_, i) => changed[i]);
 }
 
-let shared: ArtifactsDb | undefined;
-const store = () => (shared ??= new ArtifactsDb(openStore()));
+let shared: NotesDb | undefined;
+const store = () => (shared ??= new NotesDb(openStore()));
 
-export const findArtifacts = (filter: ArtifactFilter): Artifact[] => store().find(filter);
+export const findNotes = (filter: NoteFilter): Note[] => store().find(filter);
 
-export const saveArtifact = (artifact: ArtifactInput): { replaced: boolean } => store().save(artifact);
+export const saveNote = (note: NoteInput): { replaced: boolean } => store().save(note);
 
-export const deleteArtifact = (project: string, topic: string): boolean => store().delete(project, topic);
+export const deleteNote = (project: string, topic: string): boolean => store().delete(project, topic);
