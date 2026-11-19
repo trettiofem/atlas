@@ -1,4 +1,4 @@
-# scip-test
+# Atlas
 
 **Warning**: this project is both very vibe-coded and untested, proceed with caution.
 

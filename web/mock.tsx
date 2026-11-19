@@ -12,4 +12,4 @@ export interface Project {
   branch: string;
 }
 
-export const PROJECT: Project = { repo: "neo4j/scip-test", branch: "trunk" };
+export const PROJECT: Project = { repo: "neo4j/atlas", branch: "trunk" };
