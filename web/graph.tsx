@@ -530,7 +530,7 @@ function PathPanel({
               disabled={!form.from && !form.to}
               onClick={() => set({ from: form.to, to: form.from })}
             >
-              <ArrowDownUp />
+              <ArrowDownUp className="size-4" />
             </Button>
           }
         />
@@ -566,8 +566,8 @@ function PathPanel({
           <section aria-label="Path">
             <div className="flex items-center justify-between border-b py-2 pr-2 pl-4">
               <h2 className="font-medium">{result.edges.length === 1 ? "1 step" : `${result.edges.length} steps`}</h2>
-              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onClear}>
-                Clear
+              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Clear path" title="Clear path" onClick={onClear}>
+                <X />
               </Button>
             </div>
             <ol>
