@@ -1,4 +1,21 @@
-# Atlas
+<p align="center">
+  <img src="logo.png" alt="Atlas" width="160">
+  <br>
+  <b>Atlas: Intelligent Code Analysis Platform</b>
+</p>
+
+Atlas turns a TypeScript code base into a code graph (symbols, calls, references, imports and tests) that you and AI agents can search and explore. Ask questions in plain words, and agents answer by querying the graph instead of grepping, pointing at the exact lines they mean.
+
+**Runs locally.** The graph lives in an embedded database on your machine. Only the agents and the Explain chat call the Anthropic API, and they need a `CLAUDE_API_KEY`.
+
+## When to use Atlas
+
+- **Get oriented in unfamiliar code.** Ask an agent to explain a module, or find a symbol and read its source with callers and callees beside it.
+- **Check what a change could affect.** See who calls a function, which files reference it, which tests cover it and what its impact is.
+- **Find dead code.** List symbols nothing uses.
+- **Explore visually.** Expand the Code Graph from any symbol or file, or find the shortest path between two of them.
+- **Keep what you learn.** Agents save long investigations as field notes, and flag them when the files they cover change.
+- **Give your own agents the same tools.** The graph is also an MCP server, so tools like Claude Code can query it.
 
 **Warning**: this project is both very vibe-coded and untested, proceed with caution.
 
