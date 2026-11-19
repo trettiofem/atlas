@@ -44,9 +44,12 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
 | `blue` | `#2176CC` | Logo, **ready** agents, primary button fill, focus | `ring` |
 | `dark-blue` | `#19599A` | Primary button border and lip | none |
 | `salmon` | `#FF7D6E` | **Working** agents | `destructive` (placeholder) |
+| `purple` | `#C878AF` | Syntax: keywords | none |
+| `green` | `#26854C` | Syntax: strings | none |
+| `yellow` | `#F3A833` | Syntax: numbers and literals | none |
 
 - **Hover / active fill**: `accent` is neutral-67 mixed 40% into neutral-100. Apart from the syntax colors, it is the only derived color.
-- **Syntax colors**: the `--syntax-*` variables in `style.css` feed Shiki's CSS-variables theme. Keywords are `dark-blue`, functions and types `blue`, strings a darkened salmon, comments a lightened neutral-33 and punctuation neutral-33. Everything else, including Shiki's broad "constant" group, is plain text. The two mixed colors keep 4.5:1 contrast on the background.
+- **Syntax colors**: the `--syntax-*` variables in `style.css` feed Shiki's CSS-variables theme. Keywords are a darkened `purple`, functions and types `blue`, strings a darkened `green`, numbers and `true`/`false`/`null` a darkened `yellow`, comments a lightened neutral-33 and punctuation neutral-33. Shiki's broad "constant" group (which also covers objects and property names) stays plain text, so the literals get their own rule in `highlight.ts` (`--syntax-token-number`). Everything else is plain text. The mixed colors keep 4.5:1 contrast on the background.
 - **Light mode only.** The palette has no dark values yet, so don't add `dark:` styling until it does.
 
 ### Typography

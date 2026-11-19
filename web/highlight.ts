@@ -10,6 +10,11 @@ const EXTENSIONS: Record<string, string> = { pyi: "python", h: "c", cc: "cpp", c
 
 /** Token colors are `var(--syntax-token-*)`, defined in style.css. */
 const THEME = createCssVariablesTheme({ name: "atlas", variablePrefix: "--syntax-", fontStyle: false });
+// Shiki's "constant" group is too broad to color, so literals get their own rule; it comes later, so it wins.
+THEME.tokenColors?.push({
+  scope: ["constant.numeric", "constant.language"],
+  settings: { foreground: "var(--syntax-token-number)" },
+});
 
 let highlighter: Promise<HighlighterCore> | undefined;
 const getHighlighter = () =>
