@@ -70,7 +70,7 @@ Use the Tailwind token classes (`text-neutral-33`, `bg-blue`) or the shadcn sema
   - The lip is a shadow, not `border-b-4`. shadcn buttons have fixed heights, so thinning a real bottom border on press would push the bottom edge down instead of sinking the face.
   - Ghost buttons (sidebar trigger, close `X`, file references) and non-interactive surfaces stay flat.
 - **Radius**: `--radius` is 0.5rem. Buttons and chips are `rounded-md` (6px). The prompt box and large containers are `rounded-xl` (12px).
-- **Focus**: `ring` is `blue`. The prompt box shows focus with a blue border (`border-ring`), not a halo. Other controls keep shadcn's ring: a blue border plus a translucent blue halo.
+- **Focus**: `ring` is `blue`. Text boxes (`InputGroup`, so the prompt box too) show focus with a blue border and a blue lip (`border-ring` plus `shadow-raised-focus`), not a halo. Other controls keep shadcn's ring: a blue border plus a translucent blue halo. On raised buttons (`outline`, `primary`) the halo wraps the lip too, and the lip takes the border's color (`ring-raised` / `ring-raised-primary` in `style.css`, already in the variants). That halo is `--focus-halo`, the ring at 50% mixed opaque into the background, because its two overlapping shadows would show a darker band if it were translucent. Pressed or toggled, the halo goes back to hugging the face.
 - **Icons**: Lucide at 16px (`size-4`) in neutral-33. Icon-only buttons are 32px square (`size="icon-sm"`) and need an `aria-label`.
 - **Tabs** (`web/components/ui/tabs.tsx`): triggers are raised `outline` buttons (`size="sm"`), and the active one stays sunk with the `accent` fill, like a toggled chip. There's no track. A tab bar has `p-4` and a bottom border, like the search block on Search.
 
