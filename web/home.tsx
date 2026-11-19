@@ -1,7 +1,5 @@
-import { FolderCode } from "lucide-react";
 import { useRef, useState } from "react";
 import { createAgent } from "@/agents-store";
-import { type Overview, overviewCounts, useApi } from "@/api";
 import logo from "@/assets/LogoLarge.svg";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -69,12 +67,9 @@ export function Home() {
             What’s up?
           </span>
         </h1>
-        <div className={cn("w-full", INTRO)} style={introDelay(2)}>
-          <Project />
-        </div>
         <div ref={promptBox} className="w-full">
           {/* Animated inside the measured box: the tunnel reads its position, transform included. */}
-          <div className={INTRO} style={introDelay(3)}>
+          <div className={INTRO} style={introDelay(2)}>
             <PromptBox
               value={prompt}
               onValueChange={setPrompt}
@@ -85,7 +80,7 @@ export function Home() {
             />
           </div>
         </div>
-        <div className={cn("mt-2.5 flex flex-wrap justify-center gap-2", INTRO)} style={introDelay(4)}>
+        <div className={cn("mt-2.5 flex flex-wrap justify-center gap-2", INTRO)} style={introDelay(3)}>
           {SUGGESTIONS.map((s) => (
             <Button key={s.label} variant="outline" size="sm" onClick={() => fill(s.prompt)}>
               {s.label}
@@ -93,35 +88,10 @@ export function Home() {
           ))}
         </div>
         {error && <p className="mt-4 text-center text-muted-foreground">{error}</p>}
+        <p className={cn("mt-16 text-center font-mono text-xs", INTRO)} style={introDelay(4)}>
+          Atlas -- Intelligent Code Analysis Platform
+        </p>
       </div>
-    </div>
-  );
-}
-
-/** The loaded project's folder name and size, so prompts aren't sent to the wrong code base. */
-function Project() {
-  const overview = useApi<Overview>("/api/overview");
-  const root = overview.data?.project.root;
-  const counts = overview.data && overviewCounts(overview.data);
-  return (
-    // Fixed height, so the prompt box doesn't jump once the overview loads.
-    <div className="mb-2 flex h-5 w-full items-center gap-2 px-1">
-      {overview.error ? (
-        <span className="text-muted-foreground">{overview.error.notLoaded ? "No project loaded." : "Couldn’t reach the graph."}</span>
-      ) : (
-        root &&
-        counts && (
-          <>
-            <FolderCode className="size-4 shrink-0 text-muted-foreground" />
-            <span className="truncate font-mono font-medium" title={root}>
-              {root.split(/[\\/]/).filter(Boolean).pop()}
-            </span>
-            <span className="ml-auto shrink-0 text-muted-foreground">
-              {counts.files.toLocaleString()} files · {counts.testFiles.toLocaleString()} tests · {counts.symbols.toLocaleString()} symbols
-            </span>
-          </>
-        )
-      )}
     </div>
   );
 }

@@ -5,9 +5,10 @@ import { Agents, findAgent, NEW } from "@/agents";
 import { useAgents } from "@/agents-store";
 import { AppSidebar, NAV } from "@/app-sidebar";
 import { Artifacts, decodeTopic } from "@/artifacts";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Graph } from "@/graph";
 import { Home } from "@/home";
+import { ProjectHeader } from "@/project-header";
 import { Search } from "@/search";
 
 // The page lives in the URL hash (#/agents/billing, #/search?q=color), so links, Back and reload all work.
@@ -43,8 +44,7 @@ function App() {
       <AppSidebar route={path} />
       {/* Fixed height so pages like Agents scroll their own columns. */}
       <SidebarInset className="h-svh overflow-y-auto">
-        {/* On mobile the sidebar is a sheet, so it needs an opener outside itself. */}
-        <SidebarTrigger className="m-2 shrink-0 text-muted-foreground md:hidden" />
+        <ProjectHeader />
         {path === "/" ? (
           <Home />
         ) : path === "/search" ? (

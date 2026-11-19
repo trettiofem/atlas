@@ -14,6 +14,7 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - Pages: [web/home.tsx](web/home.tsx), [web/search.tsx](web/search.tsx), [web/agents.tsx](web/agents.tsx), [web/artifacts.tsx](web/artifacts.tsx) and [web/graph.tsx](web/graph.tsx) (Code Graph).
 - Shared components:
   - [web/app-sidebar.tsx](web/app-sidebar.tsx).
+ - [web/project-header.tsx](web/project-header.tsx): `ProjectHeader`, the 40px bar above every page (bottom border). On the left are ghost switchers in mono `text-xs`: `FolderGit2` with the repo and `GitBranch` with the branch, each followed by `ChevronsUpDown`. On the right, muted "92 files · 16 tests · 736 symbols" from `/api/overview` (`overviewCounts`, so the numbers match Search's hint), or "No graph loaded." The counts are hidden on phones. On mobile the sidebar trigger sits at its start. The repo and branch are mock data (`PROJECT` in `mock.tsx`), and the switchers don't open yet.
   - [web/prompt-box.tsx](web/prompt-box.tsx): the prompt box on Home and Agents.
   - [web/agent-icon.tsx](web/agent-icon.tsx): the status dot.
   - [web/source.tsx](web/source.tsx): `CodeLines`, `SourceText` (a whole file, scrolled to its highlight) and `SourcePanel`, shared by Agents and Search. Every code view goes through `CodeLines`, which takes the whole file's text and path. Snippets pass `only` with their lines, so they're colored in the context of the whole file.
@@ -27,7 +28,7 @@ The web UI in [web/](web/) is **Atlas**, a code analysis app built on the code g
 - **Backend**: everything is live. [web/api.ts](web/api.ts) has the row, graph, agent and turn types, `useApi(url)`, which fetches [src/api.ts](src/api.ts) and aborts stale requests, and `fetchJson` for one-off requests and POSTs. A 503 means no graph is loaded, or, for agent routes, that `CLAUDE_API_KEY` isn't set.
 - **Agents and the Explain chat** run on the server with the Anthropic Messages API, Haiku by default (`CLAUDE_MODEL` overrides it), using the key in `.env` (`CLAUDE_API_KEY`). [src/agent.ts](src/agent.ts) is the run loop. It starts [src/mcp.ts](src/mcp.ts) as an MCP client over stdio, so Claude gets the same code-graph tools as Claude Code, plus a local `show_code` tool that adds a file reference with its lines to the transcript. [src/agents.ts](src/agents.ts) keeps agents in memory, streams changes, and recovers agents a stopped server left working.
 - **Agents storage**: [src/agents-db.ts](src/agents-db.ts) saves agents in SQLite, in the `agents` table of `atlas.db` (git-ignored, opened by [src/store.ts](src/store.ts) and shared with artifacts), separate from the code graph. Turns and the Anthropic history are JSON columns. Agents have no owner yet; add users before agents have several.
-- **Mock data**: only the user (`USER` in [web/mock.tsx](web/mock.tsx)), shown in the sidebar footer and as every agent's creator.
+- **Mock data**: the user (`USER` in [web/mock.tsx](web/mock.tsx)), shown in the sidebar footer and as every agent's creator, and the project header's repo and branch (`PROJECT`).
 - **Recent**: [web/recent.ts](web/recent.ts) keeps, in localStorage and each with the time it was touched, the last 8 symbols opened in Search, artifacts opened (deleting one drops it) and agents opened or messaged. Opening means picking one, not the newest a page shows by default. The sidebar's "Recent" merges them.
 
 ### Design tokens
@@ -81,7 +82,7 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 ### Sidebar
 
 - 12.5rem (200px) wide and collapsible to a 3rem icon rail (shadcn `Sidebar collapsible="icon"`, ⌘B toggles it).
-- On mobile it becomes a sheet, opened by a trigger at the top of the page.
+- On mobile it becomes a sheet, opened by a trigger at the start of the project header.
 - **Expanded**:
   - Header: `LogoWordmark.svg` on the left and the collapse trigger on the right.
   - Nav: Home (`House`), Agents (`Bot`), Artifacts (`ScrollText`), Symbols (`BookSearch`, the Search page at `#/search`), Code Graph (`Waypoints`, a stand-in for the mockup's icon).
@@ -99,10 +100,10 @@ A 6px dot (`size-1.5 rounded-full`) sits on the top-right corner of the `Bot` ic
 
 A centered column 512px wide (`max-w-lg`), vertically centered, containing, from top to bottom:
 - `LogoLarge.svg` followed by "What’s up?"
-- The project row, so users know which code base they're asking about: `FolderCode`, the root's folder name in mono `font-medium` (the full path in its tooltip), and on the right muted "92 files · 16 tests · 736 symbols" from `/api/overview`. `overviewCounts` in `api.ts` does the counting, so these numbers match Search's hint. The row has a fixed height so the prompt doesn't move when the overview loads. With no graph it reads "No project loaded."
 - The prompt box: an auto-growing textarea with the placeholder "Ask me anything about the code base…", a `+` (add context) button bottom-left and a `primary` `ArrowUp` send button bottom-right. Enter sends and Shift+Enter adds a new line.
 - A row of outline suggestion chips ("Explain a module", "Find dead code", "Find callers"). Each fills the prompt with a fuller request that says what to cover and how to list results. A `[bracketed]` blank such as `[function name]` is selected when the chip fills the prompt, so typing replaces it. Prompts without a blank put the cursor at the end.
-On load the column's parts enter one after another, top to bottom, 80ms apart: the logo, the title, the project row, the prompt box and the chips. Each one fades in, rises 0.5rem and comes into focus from a 4px blur, using `animate-intro` (500ms) from `style.css`. The tunnel fades in over 1s. It's all `motion-safe:`, so reduced motion shows the page at once. The prompt box animates inside its measured wrapper, because the tunnel reads that wrapper's position and a transform on it would throw off the vanishing point.
+- The tagline, "Atlas -- Intelligent Code Analysis Platform", in mono `text-xs`, 4rem below the chips.
+On load the column's parts enter one after another, top to bottom, 80ms apart: the logo, the title, the prompt box, the chips and the tagline. (The project header above the page says which code base you're asking about.) Each one fades in, rises 0.5rem and comes into focus from a 4px blur, using `animate-intro` (500ms) from `style.css`. The tunnel fades in over 1s. It's all `motion-safe:`, so reduced motion shows the page at once. The prompt box animates inside its measured wrapper, because the tunnel reads that wrapper's position and a transform on it would throw off the vanishing point.
 
 Behind the column is a 3D wireframe tunnel (`Tunnel`): 1px neutral-67 lines on the flat background, in one-point perspective, with the vanishing point at the prompt box's center. It's an SVG generated from the page size, re-measured on resize. Its empty end wall (640×480 by default) frames the column, so no lines cross the text. Props set the end size, the line counts (`columns`, `rows`) and the camera `depth`. Floor cells are square in 3D, so the cross-lines bunch up toward the end.
 
