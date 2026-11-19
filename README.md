@@ -17,8 +17,6 @@ Atlas turns a TypeScript code base into a code graph (symbols, calls, references
 - **Keep what you learn.** Agents save long investigations as field notes, and flag them when the files they cover change.
 - **Give your own agents the same tools.** The graph is also an MCP server, so tools like Claude Code can query it.
 
-**Warning**: this project is both very vibe-coded and untested, proceed with caution.
-
 MVP code graph: index TypeScript with [scip-typescript](https://github.com/sourcegraph/scip-typescript), load the SCIP index into an embedded [RelateDB](https://relatedb.ai) store, and query it
 from an agent through an MCP server, or from the CLI.
 
