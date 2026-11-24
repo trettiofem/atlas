@@ -7,7 +7,7 @@ import { createServer as createVite } from "vite";
 const WEB_ROOT = fileURLToPath(new URL("../web", import.meta.url));
 const ENV_FILE = fileURLToPath(new URL("../.env", import.meta.url));
 
-// PORT, and CLAUDE_API_KEY (and CLAUDE_MODEL) for the agents; loaded before the API module reads them.
+// PORT, and CLAUDE_API_KEY (and CLAUDE_MODEL) or OLLAMA_MODEL (and OLLAMA_HOST) for the agents; loaded before the API module reads them.
 if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 const PORT = Number(process.env.PORT) || 5182;
 const { handleApi } = await import("./api.js");

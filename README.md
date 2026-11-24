@@ -6,7 +6,7 @@
 
 Atlas turns a TypeScript code base into a code graph (symbols, calls, references, imports and tests) that you and AI agents can search and explore. Ask questions in plain words, and agents answer by querying the graph instead of grepping, pointing at the exact lines they mean.
 
-**Runs locally.** The graph lives in an embedded database on your machine. Only the agents and the Explain chat call the Anthropic API, and they need a `CLAUDE_API_KEY`.
+**Runs locally.** The graph lives in an embedded database on your machine. Only the agents and the Explain chat call a model: the Anthropic API with a `CLAUDE_API_KEY`, or a local Ollama model with `OLLAMA_MODEL`.
 
 ## When to use Atlas
 
@@ -190,7 +190,15 @@ parameters and never pass through external symbols.
 ### Agents
 
 Agents need `CLAUDE_API_KEY` in `.env`, which `pnpm web` loads. They use the newest Haiku (`claude-haiku-5-5`);
-set `CLAUDE_MODEL` to use another model. Without a key, the agent routes return 503.
+set `CLAUDE_MODEL` to use another model.
+
+To run them locally instead, set `OLLAMA_MODEL` to an [Ollama](https://ollama.com) model with tool calling (for
+example `qwen3`). With both set, agents start on the local model, and the prompt box's model menu switches between
+the two (server-wide, until a restart). Atlas sends the same Messages API requests to Ollama's
+Anthropic-compatible endpoint, which needs Ollama 0.14 or later, at `OLLAMA_HOST` (default `http://localhost:11434`).
+Small local models call tools less reliably than Haiku.
+
+With neither `CLAUDE_API_KEY` nor `OLLAMA_MODEL` set, the agent routes return 503.
 
 [src/agent.ts](src/agent.ts) runs Claude with the Messages API in a tool loop. It starts [src/mcp.ts](src/mcp.ts)
 with the MCP client SDK (the same command as `.mcp.json`), so agents get exactly the code-graph tools Claude Code

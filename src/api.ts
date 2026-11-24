@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { hasApiKey, NO_API_KEY } from "./agent.js";
+import { agentsEnabled, availableModels, chooseModel, currentModel, NO_MODEL } from "./agent.js";
 import { createAgent, deleteAgent, explain, listAgents, parseExplain, sendMessage, subscribe } from "./agents.js";
 import { NOT_LOADED, reader } from "./db.js";
 import { findPath, findSymbolId, getEdgesAmong, getNeighbors, getNode, isEdgeType, isNodeId, searchNodes } from "./graph.js";
@@ -62,6 +62,8 @@ const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
  *   POST /api/agents/<id>/messages {prompt} a follow-up; 409 while the agent is working
  *   DELETE /api/agents/<id>                 deletes the agent, stopping it if it's working
  *   POST /api/explain {file, lines, name, messages}   NDJSON: the reply's turns so far, one snapshot per line
+ *   GET  /api/model                         {model, models}: the model new runs use, and the ones .env sets up
+ *   POST /api/model {model}                 switches it, server-wide
  * and for field notes (see src/notes-db.ts), scoped to the loaded project:
  *   GET    /api/notes                       every note, newest first, each with its `staleFiles`
  *   DELETE /api/notes?topic=<topic>         deletes one; the topic is in the query since it can hold any character
@@ -150,16 +152,23 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse) {
         res.on("close", unsubscribe);
         return;
       }
+      case "/api/model": {
+        if (req.method === "POST") {
+          const name = ((await readJson(req)) as { model?: unknown } | undefined)?.model;
+          if (typeof name !== "string" || !chooseModel(name)) return send(400, { error: "Expected {model}, one of `models`" });
+        } else if (req.method !== "GET") return send(405, { error: "Use GET or POST" });
+        return send(200, { model: currentModel(), models: availableModels() });
+      }
       case "/api/agents": {
         if (req.method !== "POST") return send(405, { error: "Use POST" });
-        if (!hasApiKey()) return send(503, { error: NO_API_KEY });
+        if (!agentsEnabled()) return send(503, { error: NO_MODEL });
         const prompt = promptOf(await readJson(req));
         if (!prompt) return send(400, { error: "Expected {prompt}" });
         return send(201, createAgent(prompt));
       }
       case "/api/explain": {
         if (req.method !== "POST") return send(405, { error: "Use POST" });
-        if (!hasApiKey()) return send(503, { error: NO_API_KEY });
+        if (!agentsEnabled()) return send(503, { error: NO_MODEL });
         const body = parseExplain(await readJson(req));
         if (typeof body === "string") return send(400, { error: body });
         return streamExplain(req, res, body);
@@ -184,7 +193,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse) {
     const messages = url.pathname.match(AGENT_MESSAGES);
     if (messages) {
       if (req.method !== "POST") return send(405, { error: "Use POST" });
-      if (!hasApiKey()) return send(503, { error: NO_API_KEY });
+      if (!agentsEnabled()) return send(503, { error: NO_MODEL });
       const prompt = promptOf(await readJson(req));
       if (!prompt) return send(400, { error: "Expected {prompt}" });
       const sent = sendMessage(messages[1], prompt);

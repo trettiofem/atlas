@@ -1,6 +1,56 @@
-import { ArrowUp, Plus } from "lucide-react";
+import { ArrowUp, ChevronsUpDown, Plus } from "lucide-react";
+import { useState } from "react";
+import { fetchJson, type ModelInfo, useApi } from "@/api";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
+
+/** The model agents run on, and a switcher when `.env` sets up both a local model and Claude. */
+function ModelPicker() {
+  const fetched = useApi<ModelInfo>("/api/model").data;
+  const [switched, setSwitched] = useState<ModelInfo>();
+  const info = switched ?? fetched;
+  if (!info?.model) return null;
+  if (info.models.length < 2) {
+    return (
+      <span className="truncate font-mono text-xs font-normal" title={`Model: ${info.model}`}>
+        {info.model}
+      </span>
+    );
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="min-w-0 font-mono text-xs font-normal text-muted-foreground" title="Change model">
+          <span className="truncate">{info.model}</span>
+          <ChevronsUpDown />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuRadioGroup
+          value={info.model}
+          onValueChange={(model) =>
+            fetchJson<ModelInfo>("/api/model", { body: { model } }).then(setSwitched, (e) => console.error("[model]", e))
+          }
+        >
+          {info.models.map((m) => (
+            <DropdownMenuRadioItem key={m.name} value={m.name}>
+              <span className="font-mono text-xs">{m.name}</span>
+              <span className="ml-auto pl-4 text-xs text-muted-foreground">{m.local ? "Local" : "Claude"}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 /**
  * The "Ask me anything" box on Home and under an agent's conversation. `className` sizes the textarea. `disabled`
@@ -51,9 +101,12 @@ export function PromptBox({
           <InputGroupButton variant="outline" size="icon-sm" className="shadow-raised" aria-label="Add context">
             <Plus />
           </InputGroupButton>
-          <InputGroupButton type="submit" variant="primary" size="icon-sm" className="shadow-raised-primary" aria-label="Send" disabled={blocked}>
-            <ArrowUp />
-          </InputGroupButton>
+          <div className="flex min-w-0 items-center gap-3">
+            <ModelPicker />
+            <InputGroupButton type="submit" variant="primary" size="icon-sm" className="shadow-raised-primary" aria-label="Send" disabled={blocked}>
+              <ArrowUp />
+            </InputGroupButton>
+          </div>
         </InputGroupAddon>
       </InputGroup>
     </form>

@@ -42,6 +42,13 @@ export function overviewCounts({ languages, kinds }: Overview) {
   };
 }
 
+/** The model agents and the Explain chat run on; null when neither CLAUDE_API_KEY nor OLLAMA_MODEL is set. */
+export interface ModelInfo {
+  model: string | null;
+  /** The local model (if any) first, then Claude (if any). */
+  models: { name: string; local: boolean }[];
+}
+
 export interface FileText {
   file: string;
   text: string;

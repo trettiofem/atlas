@@ -18,7 +18,7 @@ export type Turn =
   | { type: "file"; path: string; lines?: [number, number] }
   | { type: "error"; text: string };
 
-export const NO_API_KEY = "Set CLAUDE_API_KEY in .env to use agents.";
+export const NO_MODEL = "Set CLAUDE_API_KEY or OLLAMA_MODEL in .env to use agents.";
 
 const DEFAULT_MODEL = "claude-haiku-5-5";
 const MAX_TOKENS = 8192;
@@ -30,14 +30,48 @@ const MIN_THOUGHT_MS = 1000;
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-export const hasApiKey = () => !!process.env.CLAUDE_API_KEY;
-const model = () => process.env.CLAUDE_MODEL || DEFAULT_MODEL;
+export const agentsEnabled = () => !!process.env.OLLAMA_MODEL || !!process.env.CLAUDE_API_KEY;
 
-let anthropic: Anthropic | undefined;
-function claude() {
-  if (!hasApiKey()) throw new Error(NO_API_KEY);
-  anthropic ??= new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
-  return anthropic;
+export interface ModelOption {
+  name: string;
+  /** Runs on Ollama rather than the Anthropic API. */
+  local: boolean;
+}
+
+/** The models `.env` sets up, the local one first (it's the default). */
+export function availableModels(): ModelOption[] {
+  const models: ModelOption[] = [];
+  if (process.env.OLLAMA_MODEL) models.push({ name: process.env.OLLAMA_MODEL, local: true });
+  if (process.env.CLAUDE_API_KEY) models.push({ name: process.env.CLAUDE_MODEL || DEFAULT_MODEL, local: false });
+  return models;
+}
+
+// Server-wide and in memory: every tab shares it, and a restart goes back to the default.
+let chosen: string | undefined;
+const current = (): ModelOption | undefined => {
+  const models = availableModels();
+  return models.find((m) => m.name === chosen) ?? models[0];
+};
+
+/** The model agents run on, or null when they're off. */
+export const currentModel = () => current()?.name ?? null;
+
+/** Switches the model new runs use; false if `.env` doesn't set it up. */
+export function chooseModel(name: string): boolean {
+  if (!availableModels().some((m) => m.name === name)) return false;
+  chosen = name;
+  return true;
+}
+
+// The local model goes through Ollama's Anthropic-compatible endpoint (Ollama 0.14+), with the same SDK.
+const clients: { local?: Anthropic; claude?: Anthropic } = {};
+function llm() {
+  const option = current();
+  if (!option) throw new Error(NO_MODEL);
+  const client = option.local
+    ? (clients.local ??= new Anthropic({ baseURL: process.env.OLLAMA_HOST || "http://localhost:11434", apiKey: "ollama" }))
+    : (clients.claude ??= new Anthropic({ apiKey: process.env.CLAUDE_API_KEY }));
+  return { client, model: option.name };
 }
 
 // The same server and command as .mcp.json, so agents see exactly the tools Claude Code does.
@@ -139,6 +173,8 @@ export async function runAgent({ history, turns, onChange, signal }: RunOptions)
   const push = <T extends Turn>(turn: T) => (turns.push(turn), turn);
   const runStart = history.length - 1;
   try {
+    // Fixed for the whole run, since its thinking blocks only work with the model that made them.
+    const { client, model } = llm();
     const graph = await codeGraph();
     const tools = [...graph.tools, SHOW_CODE];
     const system = await systemPrompt(graph.client.getInstructions());
@@ -156,7 +192,7 @@ export async function runAgent({ history, turns, onChange, signal }: RunOptions)
 
       let answer: Extract<Turn, { type: "answer" }> | undefined;
       const messages = withoutEarlierThinking(history, runStart);
-      const stream = claude().messages.stream({ model: model(), max_tokens: MAX_TOKENS, system, tools, messages }, { signal });
+      const stream = client.messages.stream({ model, max_tokens: MAX_TOKENS, system, tools, messages }, { signal });
       stream.on("text", (delta) => {
         settleThought();
         answer ??= push({ type: "answer", text: "" });
@@ -179,7 +215,7 @@ export async function runAgent({ history, turns, onChange, signal }: RunOptions)
         return;
       }
       if (uses.length === 0) {
-        if (message.stop_reason === "refusal") push({ type: "error", text: "Claude declined to answer." });
+        if (message.stop_reason === "refusal") push({ type: "error", text: "The model declined to answer." });
         return;
       }
       if (message.stop_reason !== "tool_use") console.warn(`[agent] tool calls with stop reason ${message.stop_reason}`);
@@ -277,9 +313,11 @@ export async function nameAgent(prompt: string): Promise<{ title: string; descri
     },
   };
   try {
-    const message = await claude().messages.create({
-      model: model(),
-      max_tokens: 300,
+    const { client, model } = llm();
+    const message = await client.messages.create({
+      model,
+      // Room for local models that think before calling the tool.
+      max_tokens: 2048,
       tools: [tool],
       tool_choice: { type: "tool", name: tool.name },
       messages: [{ role: "user", content: `Name an agent for this request about a code base:\n\n${prompt}` }],
